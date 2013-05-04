@@ -16,11 +16,16 @@ const int maxKeys = order*2;
 template <typename E> 
 class BTree : public Container<E> {
 
+	class InnerNode;
 	// SUBCLASS NODE
 	class Node {
 		public:
+			Node* parent;
+			Node(Node* p): parent(p) {
+				
+			}
 			virtual ~Node() {}
-			inline virtual bool isLeafNode() = 0;
+			virtual bool isLeafNode() = 0;
 			virtual void print(int depth = 0) = 0;
 	};
 	class InnerNode : public Node {
@@ -29,16 +34,21 @@ class BTree : public Container<E> {
 			Node *children[maxData];
 			int sizeChildren;
 			int sizeKeys;
-			inline bool isLeafNode() {
+			bool isLeafNode() {
 				return false;
 			}
-			InnerNode(){ 
+			InnerNode(Node* pt = 0): Node(pt){ 
 				sizeChildren = 0;
 				sizeKeys = 0;
 			}
 			~InnerNode(){
 				cerr << "[~] destructing Inner node..." << endl;
-				delete[] children;
+				for (int i = 0; i < sizeChildren; i++) {
+					delete children[i];
+				}
+				sizeChildren = 0;
+				sizeKeys = 0;
+				/*children = 0;*/
 			}
 			void print(int depth = 0) {
 				cout << endl;
@@ -62,10 +72,11 @@ class BTree : public Container<E> {
 			E data[order*2+1];
 			Node *next;
 			int size;
-			LeafNode() {
+			LeafNode(Node *pt = 0): Node(pt) {
 			}
 			~LeafNode() {
 				cerr << "[~] destructing Leaf node..." << endl;
+				size = 0;
 			}	
 			bool addData(const E &e) {
 				if (size >= order*2+1) {
@@ -75,6 +86,10 @@ class BTree : public Container<E> {
 					while (e > data[i] && i < size) {
 						i++;
 					}
+					if (e == data[i]) {
+						cout << "[BTree::add] already in node" << endl;
+						return true;
+					}
 					for (int s = size; s > i; s--) {
 						data[s] = data[s-1];
 					}
@@ -83,7 +98,7 @@ class BTree : public Container<E> {
 					return true;
 				}	
 			}
-			inline bool isLeafNode() {
+			bool isLeafNode() {
 				return true;
 			}
 			void print(int depth = 0) {
@@ -132,7 +147,7 @@ class BTreeInternalErrorException : public ContainerException {
 
 template <typename E> 
 BTree<E>::BTree(){
-	root = new LeafNode;
+	root = new LeafNode(0);
 }
 
 /*template <typename E> */
@@ -148,22 +163,27 @@ BTree<E>::~BTree(){
 
 template <typename E> 
 void BTree<E>::add(const E& e) {
-	cerr << "[add] adding " << e;
+	cerr << "[BTree::add] adding " << e << endl;;
 	if (root->isLeafNode()) {
+		cerr << "[BTree::add] into root (leaf) node..." << endl;;
 		LeafNode *newRoot = static_cast<LeafNode*>(root);
 		if (newRoot->addData(e)) {
-			cerr << " into root (leaf) node..." << endl;;
 			// Root Node is not full, easiest case
 			root = newRoot;
 			return;
 		} else {
-			cerr << ", splitting nodes... " << endl;
 			// Root Node is full
-			cerr << "[add] creating new nodes..." << endl;
-			LeafNode *right = new LeafNode;
-			LeafNode *left = new LeafNode;
-			cerr << "[add] populating new nodes..." << endl;
-			int stop = e > newRoot->data[order+1] ? order+1 : order;
+			// check if element already in node
+			for (int i = 0; i < newRoot->size; i++) {
+				if (e == newRoot->data[i])
+					return;
+			}
+			cerr << "[BTree::add] splitting nodes... " << endl;
+			cerr << "[BTree::add] creating new nodes..." << endl;
+			LeafNode *right = new LeafNode();
+			LeafNode *left = new LeafNode();
+			cerr << "[BTree::add] populating new nodes..." << endl;
+			int stop = e > newRoot->data[order] ? order+1 : order;
 			for (int i = 0; i < stop; i++) {
 				left->data[i] = newRoot->data[i];
 				left->size++;
@@ -172,33 +192,80 @@ void BTree<E>::add(const E& e) {
 				right->data[i-stop] = newRoot->data[i];
 				right->size++;
 			}
-			if (right->data[0] > e) {
-				left->addData(e);
-			} else {
-				right->addData(e);
-			}
-			cerr << "[add] connecting new nodes to new root..." << endl;
-			InnerNode *newRoot = new InnerNode;
+			stop == order ? left->addData(e) : right->addData(e);
+			cerr << "[BTree::add] connecting new nodes to new root..." << endl;
+			InnerNode *newRoot = new InnerNode(0);
 			newRoot->children[0] = left;
 			newRoot->children[1] = right;
 			newRoot->keys[0] = right->data[0];
 			newRoot->sizeChildren = 2;
 			newRoot->sizeKeys = 1;
-			cerr << "[add] deleting old root..." << endl;
 			delete root;
 			root = newRoot;
-			cerr << "[add] done, returning" << endl;
+			left->parent = root;
+			right->parent = root;
+			cerr << "[BTree::add] done, returning" << endl;
 			return;
 		}
 	}
-	// look if value already exists
-	cerr << " into tree, searching for value..." << endl;
-	cerr << "ERROR: no case defined yet, undefined behaviour" << endl;
+
+	Node *current = root;
+	cerr << "[BTree::add] looking up appropriate node..." << endl;
+	int parent_index = 0;
+	while (!current->isLeafNode()) {
+		InnerNode* temp = static_cast<InnerNode*>(current);
+		while ((e > temp->keys[parent_index] or e == temp->keys[parent_index]) and parent_index < temp->sizeKeys) {
+			parent_index++;
+		}
+		current = temp->children[parent_index];
+	}
+	// found node, check if element already in there
+	LeafNode* temp = static_cast<LeafNode*>(current);
+	for (int i = 0; i < temp->size; i++) {
+		if (temp->data[i] == e) {
+			return;
+		}
+	}
+	cerr << "[BTree::add] node found, attempting to insert..." << endl;
+	if (temp->addData(e)) {
+		cerr << "[BTree::add] inserted, returning" << endl;
+		return;
+	}
+	cerr << "[BTree::add] node full, splitting nodes..." << endl;
+	LeafNode *right = new LeafNode(temp->parent);
+	LeafNode *left = new LeafNode(temp->parent);
+	int stop = e > temp->data[order] ? order+1 : order;
+	for (int i = 0; i < stop; i++) {
+		left->data[i] = temp->data[i];
+		left->size++;
+	}
+	for (int i = stop; i < order*2+1; i++) {
+		right->data[i-stop] = temp->data[i];
+		right->size++;
+	}
+	InnerNode *curr = static_cast<InnerNode*>(temp->parent);
+	delete temp;
+	E new_thres = right->data[0];
+	stop = order ? left->addData(e) : right->addData(e);
+
+	// here starts the recursive part
+	curr->children[parent_index] = left;
+	if (curr->sizeKeys < maxKeys) {
+		int i = 0;
+		for (int s = curr->sizeKeys; s > parent_index; s--) {
+			curr->keys[s] = curr->keys[s-1];
+			curr->children[s] = curr->children[s-1];
+		}
+		curr->keys[i] = new_thres;
+		curr->children[i] = right;
+		curr->sizeKeys++;
+		curr->sizeChildren++;
+	}
 }
 
 template <typename E>
 void BTree<E>::add(const E e[], size_t s) {
-	for (int i = 0; i < s; i++) {
+	for (unsigned i = 0; i < s; i++) {
 		add(e[i]);
 	}
 	
@@ -216,19 +283,19 @@ void BTree<E>::remove(const E e[], size_t s){
 
 template <typename E> 
 bool BTree<E>::member(const E& e ) const{
+	cerr << "[member] " << e << "?\n";
 	Node *current = root;
 	cerr << endl;
 	while (!current->isLeafNode()) {
 		InnerNode* temp = static_cast<InnerNode*>(current);
 		int next = 0;
-		while (e > temp->keys[next] and next < temp->sizeKeys) {
+		while ((e > temp->keys[next] or e == temp->keys[next]) and next < temp->sizeKeys) {
 			next++;
 		}
 		current = temp->children[next];
 	}
 	LeafNode* temp = static_cast<LeafNode*>(current);
 	for (int i = 0; i < temp->size; i++) {
-		cerr << "[member] " << temp->data[i] << "==" << e << "?\n";
 		if (temp->data[i] == e) {
 			return true;
 		}
@@ -263,6 +330,7 @@ E BTree<E>::max() const{
 
 template <typename E>
 std::ostream& BTree<E>::print(std::ostream &o) const{
+	return o;
 }
 
 #endif //BINTREE_H

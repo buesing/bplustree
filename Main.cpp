@@ -2,27 +2,51 @@
 #include <stdlib.h>
 #include <time.h>
 
+class Wrapper{
+	public:
+		int data;
+		Wrapper(int d = -1){
+			data = d;
+		}
+		~Wrapper(){
+			data = 0;
+		}
+		bool operator>(const Wrapper t) const {
+			return (data > t.data);
+		}
+		bool operator==(const Wrapper t) const {
+			return (data == t.data);
+		}
+};
+
+ostream& operator<< (ostream &out, const Wrapper &w) {
+	out << w.data;
+	return out;
+}
+
 int main(){
 	srand(time(NULL));
 	for (int r = 0; r < 1000; r++) {
-		BTree<int> *bt = new BTree<int>;
-		int add = 0;
-		for (int i = 0; i < 6; i++) {
-			add = (rand() % 256);
-			bt->add(add);
+		BTree<Wrapper> *bt = new BTree<Wrapper>();
+		for (int i = 0; i < 12; i++) {
+			int a = rand() % 100;
+			Wrapper *add = new Wrapper(a);
+			bt->add(*add);
 			bt->root->print();
-			cout << "member " << add << "?\n" << endl;
-			if (bt->member(add)){
-				cout << "yes" << endl;
+			//cout << "member " << add << "?\n" << endl;
+			if (bt->member(*add)){
+				//cout << "yes" << endl;
 			} else {
-				cout << "no" << endl;
+				//cout << "no" << endl;
 				return -1;
 			}
+			delete add;
+			add = 0;
 		}
-		cout << "############################################" << endl;
-		cout << endl << endl << endl << endl;
 		delete bt;
+		cout << endl << "############################################" << endl << endl;
 		bt = 0;
+		cout << r << endl;
 	}
 	//bt.add(54);
 	//cout << "test" << endl;
