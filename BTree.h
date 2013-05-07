@@ -51,19 +51,17 @@ class BTree : public Container<E> {
 				/*children = 0;*/
 			}
 			void print(int depth = 0) {
-				cout << endl;
-				cout << std::string(depth, '\t') << "[print] Inner Node" << endl;
-				cout << std::string(depth, '\t') << "[print] sizeKeys: " << sizeKeys << endl;
-				cout << std::string(depth, '\t') << "[print] sizeChildren: " << sizeChildren << endl;
-				cout << std::string(depth, '\t') << "[print] keys: ";
+				cerr << std::string(depth*2, '-') << "[print] Inner Node" << endl;
+				cerr << std::string(depth*2, '-') << "[print] sizeKeys: " << sizeKeys << endl;
+				cerr << std::string(depth*2, '-') << "[print] sizeChildren: " << sizeChildren << endl;
+				cerr << std::string(depth*2, '-') << "[print] keys: ";
 				for (int i = 0; i < sizeKeys; i++) {
-					std::cout << keys[i] << " ";
+					std::cerr << keys[i] << " ";
 				}
-				cout << endl << endl << std::string(depth, '\t') << "--------- children: ---------" << endl;
 				for (int i = 0; i < sizeChildren; i++) {
 					children[i]->print(depth + 1);
 				}
-				cout << endl;
+				cerr << endl;
 			}
 	};
 
@@ -87,7 +85,7 @@ class BTree : public Container<E> {
 						i++;
 					}
 					if (e == data[i]) {
-						cout << "[BTree::add] already in node" << endl;
+						cerr << "[BTree::add] already in node" << endl;
 						return true;
 					}
 					for (int s = size; s > i; s--) {
@@ -102,14 +100,14 @@ class BTree : public Container<E> {
 				return true;
 			}
 			void print(int depth = 0) {
-				cout << endl;
-				cout << std::string(depth, '\t') << "[print] Leaf Node" << endl;
-				cout << std::string(depth, '\t') << "[print] size: " << size << endl;
-				cout << std::string(depth, '\t') << "[print] data: ";
+				cerr << endl;
+				cerr << string(depth*2, '-') << "[print] Leaf Node" << endl;
+				cerr << string(depth*2, '-') << "[print] size: " << size << endl;
+				cerr << string(depth*2, '-') << "[print] data: ";
 				for (int i = 0; i < size; i++) {
-					std::cout << data[i] << " ";
+					cerr << data[i] << " ";
 				}
-				cout << endl << endl;
+				cerr << endl;
 			}
 	};
 	// END SUBCLASS NODE
@@ -213,8 +211,11 @@ void BTree<E>::add(const E& e) {
 	cerr << "[BTree::add] looking up appropriate node..." << endl;
 	int parent_index = 0;
 	while (!current->isLeafNode()) {
+		parent_index = 0;
 		InnerNode* temp = static_cast<InnerNode*>(current);
-		while ((e > temp->keys[parent_index] or e == temp->keys[parent_index]) and parent_index < temp->sizeKeys) {
+		while ((e > temp->keys[parent_index] or 
+				e == temp->keys[parent_index]) and 
+				parent_index < temp->sizeKeys) {
 			parent_index++;
 		}
 		current = temp->children[parent_index];
@@ -232,6 +233,7 @@ void BTree<E>::add(const E& e) {
 		return;
 	}
 	cerr << "[BTree::add] node full, splitting nodes..." << endl;
+	// TODO smth wrong here
 	LeafNode *right = new LeafNode(temp->parent);
 	LeafNode *left = new LeafNode(temp->parent);
 	int stop = e > temp->data[order] ? order+1 : order;
@@ -244,23 +246,29 @@ void BTree<E>::add(const E& e) {
 		right->size++;
 	}
 	InnerNode *curr = static_cast<InnerNode*>(temp->parent);
-	delete temp;
-	E new_thres = right->data[0];
-	stop = order ? left->addData(e) : right->addData(e);
+	stop == order ? left->addData(e) : right->addData(e);
+	cerr << "[BTree::add] nodes split, attempting to insert new key into parent..." << endl;
 
 	// here starts the recursive part
-	curr->children[parent_index] = left;
+	/*curr->children[parent_index] = left;*/
 	if (curr->sizeKeys < maxKeys) {
-		int i = 0;
-		for (int s = curr->sizeKeys; s > parent_index; s--) {
-			curr->keys[s] = curr->keys[s-1];
-			curr->children[s] = curr->children[s-1];
+		for (int i = curr->sizeKeys; i > parent_index; i--) {
+			curr->keys[i] = curr->keys[i-1];
 		}
-		curr->keys[i] = new_thres;
-		curr->children[i] = right;
+		curr->keys[parent_index+1] = right->data[0];
+		curr->keys[parent_index] = left->data[0];
 		curr->sizeKeys++;
+
+		for (int i = curr->sizeChildren; i > parent_index; i--) {
+			curr->children[i] = curr->children[i-1];
+		}
+		curr->children[parent_index+1] = right;
+		curr->children[parent_index] = left;
 		curr->sizeChildren++;
+	} else {
+	cerr << "[BTree::add] parent node full, splitting inner node..." << endl;
 	}
+	// /TODO 
 }
 
 template <typename E>
@@ -295,6 +303,7 @@ bool BTree<E>::member(const E& e ) const{
 		current = temp->children[next];
 	}
 	LeafNode* temp = static_cast<LeafNode*>(current);
+	temp->print();
 	for (int i = 0; i < temp->size; i++) {
 		if (temp->data[i] == e) {
 			return true;
