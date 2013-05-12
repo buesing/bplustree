@@ -28,12 +28,12 @@ int main(){
 	srand(time(NULL));
 	for (int r = 0; r < 1000; r++) {
 		BTree<Wrapper> *bt = new BTree<Wrapper>();
-		for (int i = 0; i < 100; i++) {
+		for (int i = 0; i < 1000; i++) {
 			int a = rand() % 100;
 			cout << i << endl << endl;
 			Wrapper *add = new Wrapper(a);
 			bt->add(*add);
-			bt->root->print();
+			//bt->root->print();
 			//cout << "member " << add << "?\n" << endl;
 			//cout << r << endl;
 			if (bt->member(*add)){
