@@ -9,7 +9,7 @@ using namespace std;
 class BTreeEmptyException;
 class BTreeInternalErrorException;
 
-const int order = 2;
+const int order = 1;
 const int maxData = order*2+1;
 const int maxKeys = order*2;
 
@@ -17,12 +17,14 @@ template <typename E>
 class BTree : public Container<E> {
 
 	class InnerNode;
+	class LeafNode;
 	// SUBCLASS NODE
 	class Node {
 		public:
 			Node* parent;
 			Node(Node* p): parent(p) {
-				
+			}
+			virtual void init() {
 			}
 			virtual ~Node() {}
 			virtual bool isLeafNode() = 0;
@@ -42,7 +44,7 @@ class BTree : public Container<E> {
 				sizeKeys = 0;
 			}
 			~InnerNode(){
-				cerr << "[~] destructing Inner node..." << endl;
+				cerr << "[InnerNode::~] destructing Inner node..." << endl;
 				for (int i = 0; i < sizeChildren; i++) {
 					delete children[i];
 				}
@@ -50,14 +52,66 @@ class BTree : public Container<E> {
 				sizeKeys = 0;
 				/*children = 0;*/
 			}
+			void init() {
+				sizeChildren = 0;
+				sizeKeys = 0;
+			}
+			bool insertLeafNode(LeafNode* n) {
+				if (sizeChildren < maxData) {
+					cerr << "[InnerNode::insertLeafNode] inserting..." << endl;
+					int at = 0;
+					while (n->data[0] > keys[at] and sizeKeys != at) {
+						at++;
+					}
+					for (int i = sizeKeys; i > at ; i--) {
+						keys[i] = keys[i-1];
+					}
+					keys[at] = n->data[0];
+					at++;
+					for (int i = sizeChildren; i > at; i--) {
+						children[i] = children[i-1];
+					}
+					children[at] = n;
+					sizeKeys++;
+					sizeChildren++;
+					return true;
+				} else {
+					return false;
+				}
+			}
+			bool insertInnerNode(InnerNode* n, E& key) {
+				if (sizeChildren < maxData) {
+					n->parent = this;
+					cerr << "[InnerNode::insertInnerNode] inserting..." << endl;
+					int at = 0;
+					while (!(keys[at] > key) and sizeKeys != at) {
+						at++;
+					}
+					for (int i = sizeKeys; i > at ; i--) {
+						keys[i] = keys[i-1];
+					}
+					keys[at] = key;
+					at++;
+					for (int i = sizeChildren; i > at; i--) {
+						children[i] = children[i-1];
+					}
+					children[at] = n;
+					sizeKeys++;
+					sizeChildren++;
+					return true;
+				} else {
+					return false;
+				}
+			}
 			void print(int depth = 0) {
-				cerr << std::string(depth*2, '-') << "[print] Inner Node" << endl;
-				cerr << std::string(depth*2, '-') << "[print] sizeKeys: " << sizeKeys << endl;
-				cerr << std::string(depth*2, '-') << "[print] sizeChildren: " << sizeChildren << endl;
-				cerr << std::string(depth*2, '-') << "[print] keys: ";
+				cerr << std::string(depth*6, '-') << "[print] Inner Node" << endl;
+				cerr << std::string(depth*6, '-') << "[print] sizeKeys: " << sizeKeys << endl;
+				cerr << std::string(depth*6, '-') << "[print] sizeChildren: " << sizeChildren << endl;
+				cerr << std::string(depth*6, '-') << "[print] keys: ";
 				for (int i = 0; i < sizeKeys; i++) {
 					std::cerr << keys[i] << " ";
 				}
+				cerr << endl;
 				for (int i = 0; i < sizeChildren; i++) {
 					children[i]->print(depth + 1);
 				}
@@ -99,11 +153,14 @@ class BTree : public Container<E> {
 			bool isLeafNode() {
 				return true;
 			}
+			void init() {
+				size = 0;
+			}
 			void print(int depth = 0) {
 				cerr << endl;
-				cerr << string(depth*2, '-') << "[print] Leaf Node" << endl;
-				cerr << string(depth*2, '-') << "[print] size: " << size << endl;
-				cerr << string(depth*2, '-') << "[print] data: ";
+				cerr << string(depth*6, '-') << "[print] Leaf Node" << endl;
+				cerr << string(depth*6, '-') << "[print] size: " << size << endl;
+				cerr << string(depth*6, '-') << "[print] data: ";
 				for (int i = 0; i < size; i++) {
 					cerr << data[i] << " ";
 				}
@@ -213,8 +270,7 @@ void BTree<E>::add(const E& e) {
 	while (!current->isLeafNode()) {
 		parent_index = 0;
 		InnerNode* temp = static_cast<InnerNode*>(current);
-		while ((e > temp->keys[parent_index] or 
-				e == temp->keys[parent_index]) and 
+		while ((e > temp->keys[parent_index] or e == temp->keys[parent_index]) and 
 				parent_index < temp->sizeKeys) {
 			parent_index++;
 		}
@@ -222,53 +278,129 @@ void BTree<E>::add(const E& e) {
 	}
 	// found node, check if element already in there
 	LeafNode* temp = static_cast<LeafNode*>(current);
-	for (int i = 0; i < temp->size; i++) {
-		if (temp->data[i] == e) {
-			return;
-		}
-	}
 	cerr << "[BTree::add] node found, attempting to insert..." << endl;
 	if (temp->addData(e)) {
 		cerr << "[BTree::add] inserted, returning" << endl;
 		return;
 	}
+
 	cerr << "[BTree::add] node full, splitting nodes..." << endl;
-	// TODO smth wrong here
-	LeafNode *right = new LeafNode(temp->parent);
-	LeafNode *left = new LeafNode(temp->parent);
-	int stop = e > temp->data[order] ? order+1 : order;
-	for (int i = 0; i < stop; i++) {
-		left->data[i] = temp->data[i];
-		left->size++;
-	}
-	for (int i = stop; i < order*2+1; i++) {
-		right->data[i-stop] = temp->data[i];
-		right->size++;
-	}
-	InnerNode *curr = static_cast<InnerNode*>(temp->parent);
-	stop == order ? left->addData(e) : right->addData(e);
-	cerr << "[BTree::add] nodes split, attempting to insert new key into parent..." << endl;
+	LeafNode* insertNode = new LeafNode(temp->parent);
 
-	// here starts the recursive part
-	/*curr->children[parent_index] = left;*/
-	if (curr->sizeKeys < maxKeys) {
-		for (int i = curr->sizeKeys; i > parent_index; i--) {
-			curr->keys[i] = curr->keys[i-1];
-		}
-		curr->keys[parent_index+1] = right->data[0];
-		curr->keys[parent_index] = left->data[0];
-		curr->sizeKeys++;
-
-		for (int i = curr->sizeChildren; i > parent_index; i--) {
-			curr->children[i] = curr->children[i-1];
-		}
-		curr->children[parent_index+1] = right;
-		curr->children[parent_index] = left;
-		curr->sizeChildren++;
+	E dataOverflow;
+	if (e > temp->data[order*2]) {
+		dataOverflow = e;
 	} else {
-	cerr << "[BTree::add] parent node full, splitting inner node..." << endl;
+		dataOverflow = temp->data[order*2];
+		temp->size--;
+		temp->addData(e);
 	}
-	// /TODO 
+
+	for (int i = 0; i < order; i++) {
+		insertNode->data[i] = temp->data[i+order+1];
+	}
+	insertNode->data[order] = dataOverflow;
+	insertNode->size = order+1;
+	temp->size = order+1;
+
+	InnerNode* currentInner = static_cast<InnerNode*>(temp->parent);
+
+	if (currentInner->insertLeafNode(insertNode)) {
+		cerr << "[BTree::add] split leaf nodes, no further splits neccessary." << endl;
+		cerr << "[BTree::add] insert successful, returning" << endl;
+		return;
+	}
+
+	cerr << "[BTree::add] parent node full, splitting inner node..." << endl;
+	// strange technique: add element into node, save overflow ( lastt element)
+	// then split nodes in middle
+
+	LeafNode* overflow;
+	if (insertNode->data[0] > static_cast<LeafNode*>(currentInner->children[order*2])->data[0]) {
+		overflow = insertNode;
+	} else {
+		overflow = static_cast<LeafNode*>(currentInner->children[order*2]);
+		currentInner->sizeChildren--;
+		currentInner->sizeKeys--;
+		currentInner->insertLeafNode(insertNode);
+	}
+
+	InnerNode* newRight = new InnerNode(currentInner->parent);
+
+	for (int i = order+1; i < order*2; i++) {
+		newRight->keys[i-(order+1)] = currentInner->keys[i];
+		newRight->children[i-(order+1)] = currentInner->children[i];
+		newRight->children[i-(order+1)]->parent = newRight;
+	}
+	newRight->children[order-1] = currentInner->children[order*2];
+	newRight->children[order-1]->parent = newRight;
+	newRight->children[order] = overflow;
+	newRight->children[order]->parent = newRight;
+	newRight->keys[order-1] = overflow->data[0];
+
+	newRight->sizeKeys = order;
+	newRight->sizeChildren = order+1;
+
+	currentInner->sizeKeys = order;
+	currentInner->sizeChildren = order+1;
+
+	E& insertKey = currentInner->keys[order];
+
+	// now insert insertKey and newRight into parent node...
+	while (currentInner->parent) {
+		currentInner = static_cast<InnerNode*>(currentInner->parent);
+		if (currentInner->insertInnerNode(newRight, insertKey)) {
+			cerr << "[BTee::add] inserted into node, done" << endl;
+			return;
+		}
+		cerr << "[BTree::add] next parent node full, splitting..." << endl;
+		// else split this node, this time with inner nodes
+		InnerNode* overflow;
+		if (newRight->keys[0] > currentInner->keys[order*2-1]) {
+			cerr << "overflow = newright";
+			overflow = newRight;
+		} else {
+			overflow = static_cast<InnerNode*>(currentInner->children[order*2]);
+			currentInner->sizeChildren--;
+			currentInner->sizeKeys--;
+			currentInner->insertInnerNode(newRight, newRight->keys[0]);
+		}
+
+		InnerNode* newRight = new InnerNode(currentInner->parent);
+
+		for (int i = order+1; i < order*2; i++) {
+			newRight->keys[i-(order+1)] = currentInner->keys[i];
+			newRight->children[i-(order+1)] = currentInner->children[i];
+			newRight->children[i-(order+1)]->parent = newRight;
+		}
+		newRight->children[order-1] = currentInner->children[order*2];
+		newRight->children[order-1]->parent = newRight;
+		newRight->children[order] = overflow;
+		overflow->print();
+		newRight->children[order]->parent = newRight;
+		newRight->keys[order-1] = overflow->keys[0];
+
+		newRight->sizeKeys = order;
+		newRight->sizeChildren = order+1;
+
+		currentInner->sizeKeys = order;
+		currentInner->sizeChildren = order+1;
+
+		insertKey = currentInner->keys[order];
+	}
+
+	cerr << "[BTree::add] root split..." << endl;
+	InnerNode* newRoot = new InnerNode(0);
+	newRoot->keys[0] = insertKey;
+	newRoot->children[0] = currentInner;
+	newRoot->children[1] = newRight;
+	newRoot->sizeChildren = 2;
+	newRoot->sizeKeys = 1;
+	currentInner->parent = newRoot;
+	newRight->parent = newRoot;
+	root = newRoot;
+	cerr << "[BTree::add] created new root node, returning" << endl;
+	return;
 }
 
 template <typename E>
@@ -291,9 +423,8 @@ void BTree<E>::remove(const E e[], size_t s){
 
 template <typename E> 
 bool BTree<E>::member(const E& e ) const{
-	cerr << "[member] " << e << "?\n";
+	cerr << "[member] " << e << "?";
 	Node *current = root;
-	cerr << endl;
 	while (!current->isLeafNode()) {
 		InnerNode* temp = static_cast<InnerNode*>(current);
 		int next = 0;
@@ -303,12 +434,13 @@ bool BTree<E>::member(const E& e ) const{
 		current = temp->children[next];
 	}
 	LeafNode* temp = static_cast<LeafNode*>(current);
-	temp->print();
 	for (int i = 0; i < temp->size; i++) {
 		if (temp->data[i] == e) {
+			cerr << " yes" << endl;
 			return true;
 		}
 	}
+	cerr << " no!" << endl;
 	return false;
 }
 
@@ -329,12 +461,12 @@ size_t BTree<E>::apply( const Functor<E>& f, Order order = dontcare ) const{
 
 template <typename E> 
 E BTree<E>::min() const{
-	return 0;
+	return E();
 }
 
 template <typename E>
 E BTree<E>::max() const{
-	return 0;
+	return E();
 }
 
 template <typename E>
