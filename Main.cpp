@@ -25,26 +25,50 @@ ostream& operator<< (ostream &out, const Wrapper &w) {
 }
 
 int main(){
+	
 	srand(time(NULL));
-	for (int r = 0; r < 1000; r++) {
+	for (int r = 0; r < 1; r++) {
+		int add[100000]; 
+		for (int i = 0; i < 100000; i++) {
+			add[i] = rand() % 10000000;
+		}
 		BTree<Wrapper> *bt = new BTree<Wrapper>();
-		for (int i = 0; i < 1000; i++) {
-			int a = rand() % 100;
+		for (int i = 0; i < 100000; i++) {
 			cout << i << endl << endl;
-			Wrapper *add = new Wrapper(a);
-			bt->add(*add);
+			Wrapper *wr = new Wrapper(add[i]);
+			bt->add(*wr);
 			//bt->root->print();
 			//cout << "member " << add << "?\n" << endl;
 			//cout << r << endl;
-			if (bt->member(*add)){
+			if (bt->member(*wr)){
 				//cout << "yes" << endl;
 			} else {
 				//cout << "no" << endl;
 				return -1;
 			}
-			delete add;
-			add = 0;
+			//if (!bt->validate(bt->root)) {
+				//cerr << "validation failed" << endl;
+				//bt->print(cerr);
+				//return -1;
+			//}
 		}
+			bt->print(cerr);
+		for (int i = 0; i < 100; i++) {
+			cout << i << endl << endl;
+			Wrapper *wr = new Wrapper(add[i]);
+			bt->remove(*wr);
+			//bt->root->print();
+			//cout << "member " << add << "?\n" << endl;
+			//cout << r << endl;
+			if (!bt->member(*wr)){
+				//cout << "yes" << endl;
+			} else {
+				//cout << "no" << endl;
+				return -1;
+			}
+		}
+		//delete[] add;
+		bt->print(cerr);
 		delete bt;
 		cout << endl << "############################################" << endl << endl;
 		bt = 0;
