@@ -19,6 +19,18 @@ class Wrapper{
 		}
 };
 
+template <typename E>
+class PrintN : public Functor<E> {
+	std::ostream& o;
+	mutable int n;
+	public:
+	explicit PrintN( int n = 0, std::ostream& o = std::cout ) : o( o ), n( n ) { }
+	explicit PrintN( std::ostream& o ) : o( o ), n( 0 ) { }
+	bool operator()( const E& e ) const {
+		return n <= 0 || --n;
+	}
+};
+
 ostream& operator<< (ostream &out, const Wrapper &w) {
 	out << w.data;
 	return out;
@@ -30,10 +42,10 @@ int main(){
 		for (int r = 0; r < 1; r++) {
 		int add[100000]; 
 		for (int i = 0; i < 100000; i++) {
-			add[i] = rand() % 10000000;
+			add[i] = rand() % 1000;
 		}
-		BTree<Wrapper> *bt = new BTree<Wrapper>();
-		for (int i = 0; i < 100000; i++) {
+		BTree<Wrapper> *bt = new BTree<Wrapper>(2);
+		for (int i = 0; i < 40; i++) {
 			cout << i << endl << endl;
 			Wrapper *wr = new Wrapper(add[i]);
 			bt->add(*wr);
@@ -59,31 +71,34 @@ int main(){
 			//cerr << "size: " << bt->size() << endl;
 		}
 		//bt->print(cerr);
-		//for (int i = 0; i < 100; i++) {
-			//cout << i << endl << endl;
-			//Wrapper *wr = new Wrapper(add[i]);
-			//bt->remove(*wr);
-			////bt->root->print();
-			////cout << "member " << add << "?\n" << endl;
-			////cout << r << endl;
-			//if (!bt->member(*wr)){
-				////cout << "yes" << endl;
-			//} else {
-				////cout << "no" << endl;
-				//return -1;
-			//}
-		//}
-		//delete[] add;
-		for (int i = 0; i < 100000; i++) {
-			if (!bt->member(add[i])) {
-				bt->print(cerr);
-				cout << "error" << endl;
+		for (int i = 0; i < 40; i++) {
+			cout << i << endl << endl;
+			cerr << "############### removing " << add[i] << endl;
+			Wrapper *wr = new Wrapper(add[i]);
+			bt->remove(*wr);
+			bt->root->print();
+			//cout << "member " << add << "?\n" << endl;
+			//cout << r << endl;
+			if (!bt->member(*wr)){
+				//cout << "yes" << endl;
+			} else {
+				//cout << "no" << endl;
 				return -1;
 			}
 		}
-		
+		//delete[] add;
+
 		bt->print(cerr);
-		delete bt;
+		cout << "size: " << bt->size() << endl;
+		cout << "descending:" << endl;
+		size_t rc = bt->apply( PrintN<Wrapper>( 600 ), descending );
+		cout << rc << " == 100?" << endl;
+		cout << "ascending:" << endl;
+		rc = bt->apply( PrintN<Wrapper>( 10 ), ascending );
+		
+		//bt->print(cerr);
+		//cout << bt->size() << endl;
+		//delete bt;
 		cout << endl << "############################################" << endl << endl;
 		bt = 0;
 		cout << r << endl;
