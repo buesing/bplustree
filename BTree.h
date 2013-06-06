@@ -130,6 +130,7 @@ class BTree : public Container<E> {
 			}
 			~LeafNode() {
 				cerr << "[~] destructing Leaf node..." << endl;
+				delete [] data;
 			}	
 			bool addData(const E &e) {
 				int i = 0;
@@ -231,7 +232,7 @@ class BTreeInternalException : public ContainerException {
 };
 
 template <typename E> 
-BTree<E>::BTree(int o = 16): order(o){
+BTree<E>::BTree(int o = 8): order(o){
 	root = new LeafNode(0, o);
 }
 
@@ -247,9 +248,21 @@ template <typename E>
 bool BTree<E>::validate(Node *current) const {
 	if (!current->isLeafNode()) {
 		InnerNode* temp = static_cast<InnerNode*>(current);
+		if (temp->parent && temp->sizeKeys < order) {
+			cerr << "order wrong" << endl;
+			return false;
+		}
+		if (temp->sizeKeys != temp->sizeChildren-1) {
+			cerr << "children != keys " << endl;
+			return false;
+		}
 		if (!temp->children[0]->isLeafNode()) {
 			for (int i = 0; i < temp->sizeChildren; i++) {
-				validate(temp->children[i]);
+				if (!(static_cast<InnerNode*>(static_cast<InnerNode*>(temp->children[i])->parent)->keys[0] == temp->keys[0])) {
+					cerr << "parent wrong" << endl;
+					return false;
+				}
+				return (validate(temp->children[i]));
 			}
 		} else {
 			for (int childIndex = 0; childIndex < temp->sizeKeys-1; childIndex++) {
@@ -258,13 +271,12 @@ bool BTree<E>::validate(Node *current) const {
 					/*cerr << "and "<<ln->data[i]<<" <= " << temp->keys[childIndex] << "?" << endl;*/
 					if (!(temp->keys[childIndex] > ln->data[i])) {
 						cerr << temp->keys[childIndex] <<" > " << ln->data[i] << "?" << endl;
-						this->print(cerr);
 							/*!(ln->data[i] > temp->keys[childIndex])) {*/
 						return false;
 					}
 					if (temp->parent and temp->keys[0] == static_cast<InnerNode*>(temp->parent)->keys[childIndex]) {
-						root->print();
-						exit(EXIT_FAILURE);
+						cerr << "key equals first element..." << endl;
+
 						return false;
 					}
 				}
@@ -276,6 +288,16 @@ bool BTree<E>::validate(Node *current) const {
 	return true;
 	
 }
+
+/*template <typename E> */
+/*bool BTree<E>::validateParents(Node *current) const {*/
+/*if (!current->isLeafNode()) {*/
+/*for (int i = 0; i < current->sizeChildren; i++) {*/
+/*if (current == current->children[i]->parent)*/
+/*return false;*/
+/*}*/
+/*}*/
+/*}*/
 
 template <typename E> 
 BTree<E>::~BTree(){
@@ -483,9 +505,8 @@ void BTree<E>::add(const E e[], size_t s) {
 
 template <typename E> 
 void BTree<E>::remove(const E& e){
-	// TODO merge underflowing nodes
 	Node *current = root;
-	cerr << "[BTree::remove] looking up appropriate node..." << endl;
+	cerr << "[BTree::remove] looking up appropriate node to find " << e << endl;
 	int parent_index = 0;
 	while (!current->isLeafNode()) {
 		parent_index = 0;
@@ -511,17 +532,16 @@ void BTree<E>::remove(const E& e){
 	// now we have an underflow and we are not working on the root node.
 	cerr << "[BTree::remove] underflow, attempting rebuild..." << endl;
 	InnerNode* parent = static_cast<InnerNode*>(temp->parent);
-	cerr << "[BTree::remove] attempting to borrow element from left sibling..." << endl;
 	if (parent_index != 0 && static_cast<LeafNode*>(parent->children[parent_index-1])->size > order) {
+		cerr << "[BTree::remove] attempting to borrow element from left sibling..." << endl;
 		LeafNode *leftSibling = static_cast<LeafNode*>(parent->children[parent_index-1]);
 		temp->addData(leftSibling->data[--leftSibling->size]);
 		parent->keys[parent_index-1] = temp->data[0];
 		cerr << "[BTree::remove] done, returning" << endl;
 		return;
 	}
-	cerr << "[BTree::remove] attempting to borrow element from right sibling..." << endl;
-	//TODO sizekeys +1 ?????
 	if (parent_index < parent->sizeKeys && static_cast<LeafNode*>(parent->children[parent_index+1])->size > order) {
+		cerr << "[BTree::remove] attempting to borrow element from right sibling..." << endl;
 		LeafNode *rightSibling = static_cast<LeafNode*>(parent->children[parent_index+1]);
 		temp->addData(rightSibling->data[0]);
 		rightSibling->remove(rightSibling->data[0]);
@@ -529,70 +549,147 @@ void BTree<E>::remove(const E& e){
 		cerr << "[BTree::remove] done, returning" << endl;
 		return;
 	}
-	// merge with siblings
 
 	cerr << "[BTree::remove] merging with siblings..." << endl;
 	// remove key from parent node
-	cerr << "parent_index == " << parent_index << endl;
 	int i = parent_index;
 	cerr << "[BTree::remove] removing obsolete key from parent..." << endl;
-	while (i < parent->sizeKeys) {
+	while (i < parent->sizeKeys && i+1 < order*2) {
+		cerr << i << endl;
 		parent->children[i] = parent->children[i+1];
-		parent->keys[i-1] = parent->keys[i];
+		parent->keys[i] = parent->keys[i+1];
 		i++;
 	}
+	parent->children[i] = parent->children[i+1];
 	parent->sizeChildren--;
 	parent->sizeKeys--;
 	// node is now deleted, now insert remaining elements
 	cerr << "[BTree::remove] adding remaining elements..." << endl;
 	for (i = 0; i < temp->size; i++) {
-		cerr << "calling add" << endl;
-		/*root->print();*/
 		add(temp->data[i]);
 	}
-	delete temp;
+	// TODO this causes a segment fault for some reason...
+	// delete temp;
 
 	// done, now check if the parent node is underflowing
 	InnerNode *curr = parent;
 	parent = static_cast<InnerNode*>(curr->parent);
 	while (parent && curr->sizeKeys < order) {
 		parent_index = 0;
-		while (!(parent->keys[parent_index] > curr->keys[0]))
+		while (parent_index < parent->sizeKeys && !(parent->keys[parent_index] > curr->keys[0]))
 			parent_index++;
 
-		/*
-		cerr << "[BTree::remove] attempting to borrow node from left sibling..." << endl;
-		root->print();
-		cerr << parent_index << endl;
 		if (parent_index != 0 && static_cast<InnerNode*>(parent->children[parent_index-1])->sizeKeys > order) {
-			cerr << "okay" << endl;
+			cerr << "[BTree::remove] borrowing node from left sibling..." << endl;
 			InnerNode *leftSibling = static_cast<InnerNode*>(parent->children[parent_index-1]);
-			if (!curr->insertInnerNode(static_cast<InnerNode*>(leftSibling->children[leftSibling->sizeChildren-1]), 
-					leftSibling->keys[leftSibling->sizeKeys-1]))
-				throw BTreeInternalException("Couldn't merge inner nodes.");
+
+			// insert rightmost node of left sibling at beginning
+			for (int i = curr->sizeKeys; i > 0; i--) {
+				curr->keys[i] = curr->keys[i-1];
+				curr->children[i+1] = curr->children[i];
+			}
+			curr->children[1] = curr->children[0];
+			curr->children[0] = leftSibling->children[leftSibling->sizeChildren-1];
+			curr->children[0]->parent = curr;
+			curr->keys[0] = parent->keys[parent_index-1];
+			curr->sizeChildren++;
+			curr->sizeKeys++;
 			leftSibling->sizeChildren--;
 			leftSibling->sizeKeys--;
-			parent->keys[parent_index-1] = curr->keys[0];
+
+			parent->keys[parent_index-1] = leftSibling->keys[leftSibling->sizeKeys];
 			cerr << "[BTree::remove] done, returning" << endl;
 			return;
 		}
-		cerr << "[BTree::remove] attempting to borrow node from right sibling..." << endl;
 		if (parent_index < parent->sizeKeys && static_cast<InnerNode*>(parent->children[parent_index+1])->sizeKeys > order) {
+			cerr << "[BTree::remove] borrowing node from right sibling..." << endl;
 			InnerNode *rightSibling = static_cast<InnerNode*>(parent->children[parent_index+1]);
-			if (!curr->insertInnerNode(static_cast<InnerNode*>(rightSibling->children[rightSibling->sizeChildren-1]), 
-						rightSibling->keys[rightSibling->sizeKeys-1]))
-				throw BTreeInternalException("Couldn't merge inner nodes.");
+			curr->keys[curr->sizeKeys++] = parent->keys[parent_index];
+			curr->children[curr->sizeChildren++] = rightSibling->children[0];
+			curr->children[curr->sizeChildren-1]->parent = curr;
+			parent->keys[parent_index] = rightSibling->keys[0];
+			// delete old node out of right sibling
+			cerr << "ok" << endl;
+			for (int i = 0; i < rightSibling->sizeKeys-1; i++) {
+				cerr <<"rightSibling->children["<<i<<"] = rightSibling->children["<<i+1<<"]"<<endl;
+				rightSibling->children[i] = rightSibling->children[i+1];
+				cerr <<"rightSibling->keys["<<i<<"] = rightSibling->keys["<<i+1<<"]"<<endl;
+				rightSibling->keys[i] = rightSibling->keys[i+1];
+			}
+			rightSibling->children[rightSibling->sizeKeys-1] = rightSibling->children[rightSibling->sizeKeys];
 			rightSibling->sizeChildren--;
 			rightSibling->sizeKeys--;
-			parent->keys[parent_index-1] = curr->keys[0];
 			cerr << "[BTree::remove] done, returning" << endl;
 			return;
 		}
-		*/
-		cout << "........" << endl;
+
+		cerr << "[BTree::remove] attempting to merge node with siblings..." << endl;
+
+		// if right sibling, put all their elements into curr
+		if (parent_index < parent->sizeKeys) {
+			cerr << "[BTree::remove] merging with right sibling..." << endl;
+			InnerNode *rightSibling = static_cast<InnerNode*>(parent->children[parent_index+1]);
+			curr->insertInnerNode(static_cast<InnerNode*>(rightSibling->children[0]),parent->keys[parent_index]);
+			// insert elements of right sibling into this node
+			int i = 1;
+			while (i < rightSibling->sizeKeys) {
+				curr->keys[curr->sizeKeys++] = rightSibling->keys[i-1];
+				curr->children[curr->sizeChildren++] = rightSibling->children[i];
+				curr->children[curr->sizeChildren-1]->parent = curr;
+				i++;
+			}
+			cerr << "before" << endl;
+			curr->keys[curr->sizeKeys++] = rightSibling->keys[i-1];
+			curr->children[curr->sizeChildren++] = rightSibling->children[rightSibling->sizeKeys];
+			curr->children[curr->sizeChildren-1]->parent = curr;
+			// delete old key from parent node
+			i = parent_index;
+			while (i < parent->sizeKeys-1) {
+				cerr << i << endl;
+				parent->children[i+1] = parent->children[i+2];
+				parent->keys[i] = parent->keys[i+1];
+				i++;
+			}
+			parent->children[i+1] = parent->children[i+2];
+			parent->sizeKeys--;
+			parent->sizeChildren--;
+		}
+		// if left sibling, put all currs elements there
+		else if (parent_index > 0) {
+			// put as many nodes as possible in left sibling
+			cerr << "[BTree::remove] merging with left sibling..." << endl;
+			InnerNode *leftSibling = static_cast<InnerNode*>(parent->children[parent_index-1]);
+
+			leftSibling->insertInnerNode(static_cast<InnerNode*>(curr->children[0]), parent->keys[parent_index-1]);
+			for (int i = 0; i < curr->sizeKeys; i++) {
+				leftSibling->keys[leftSibling->sizeKeys++] = curr->keys[i];
+				leftSibling->children[leftSibling->sizeChildren++] = curr->children[i+1];
+				leftSibling->children[leftSibling->sizeChildren-1]->parent = leftSibling;
+			}
+			
+			// delete old key from parent node
+			int i = parent_index;
+			cerr << "paarent index: " << parent_index << endl;
+			while (i < parent->sizeKeys) {
+				cerr << "assign parent->children["<<i<<"] = parent->children["<<i+1<<"]"<<endl;
+				parent->children[i] = parent->children[i+1];
+				cerr << "assign parent->keys["<<i<<"] = parent->keys["<<i+1<<"]"<<endl;
+				parent->keys[i-1] = parent->keys[i];
+				i++;
+			}
+			parent->sizeKeys--;
+			parent->sizeChildren--;
+
+		} 
+		// done, continue with parent of parent
 		curr = parent;
 		parent = static_cast<InnerNode*>(curr->parent);
 	}
+	if (!parent and curr->sizeKeys == 0) {
+		root = curr->children[0];
+		root->parent = 0;
+	}
+	cerr << "[BTree::remove] done, returning" << endl;
 	return;
 }
 
