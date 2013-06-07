@@ -569,7 +569,7 @@ void BTree<E>::remove(const E& e){
 		add(temp->data[i]);
 	}
 	// TODO this causes a segment fault for some reason...
-	// delete temp;
+	delete temp;
 
 	// done, now check if the parent node is underflowing
 	InnerNode *curr = parent;
@@ -653,6 +653,7 @@ void BTree<E>::remove(const E& e){
 			parent->children[i+1] = parent->children[i+2];
 			parent->sizeKeys--;
 			parent->sizeChildren--;
+			/*delete rightSibling;*/
 		}
 		// if left sibling, put all currs elements there
 		else if (parent_index > 0) {
@@ -679,7 +680,6 @@ void BTree<E>::remove(const E& e){
 			}
 			parent->sizeKeys--;
 			parent->sizeChildren--;
-
 		} 
 		// done, continue with parent of parent
 		curr = parent;
