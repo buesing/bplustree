@@ -27,7 +27,6 @@ class BTree : public Container<E> {
 			}
 			virtual ~Node() {}
 			virtual bool isLeafNode() = 0;
-			virtual void recursivelyDelete() = 0;
 			virtual void print(ostream&o = cerr, int depth = 0) = 0;
 	};
 	class InnerNode : public Node {
@@ -51,22 +50,6 @@ class BTree : public Container<E> {
 				sizeKeys = 0;
 				delete [] keys;
 				delete [] children;
-				children = 0;
-				keys = 0;
-			}
-			void recursivelyDelete() {
-				cerr << "[InnerNode::~] destructing Inner node..." << endl;
-				for (int i = 0; i < sizeChildren; i++) {
-					children[i]->recursivelyDelete();
-				}
-				sizeChildren = 0;
-				sizeKeys = 0;
-				delete [] keys;
-				delete [] children;
-				/*if (this->parent) {*/
-				/*delete this->parent;*/
-				/*this->parent = 0;*/
-				/*}*/
 				children = 0;
 				keys = 0;
 			}
@@ -145,15 +128,6 @@ class BTree : public Container<E> {
 			}
 			~LeafNode() {
 				cerr << "[~] destructing Leaf node..." << endl;
-				delete [] data;
-				data = 0;
-			}	
-			void recursivelyDelete() {
-				cerr << "[~] destructing Leaf node..." << endl;
-				/*if (this->parent) {*/
-				/*delete this->parent;*/
-				/*this->parent = 0;*/
-				/*}*/
 				delete [] data;
 				data = 0;
 			}	
@@ -265,11 +239,6 @@ BTree<E>::BTree(int o = 8): order(o){
 template <typename E> 
 BTree<E>::~BTree(){
 	cerr << "[~] calling destructor..." << endl;
-	cerr << "destructing root" << endl;
-	/*if (root) {*/
-	/*root->recursivelyDelete();*/
-	/*root = 0;*/
-	/*}*/
 	delete_(root);
 }
 
@@ -320,7 +289,6 @@ bool BTree<E>::validate(Node *current) const {
 			for (int childIndex = 0; childIndex < temp->sizeKeys-1; childIndex++) {
 				LeafNode* ln = static_cast<LeafNode*>(temp->children[childIndex]);
 				for (int i = 0; i < ln->size; i++) {
-					/*cerr << "and "<<ln->data[i]<<" <= " << temp->keys[childIndex] << "?" << endl;*/
 					if (!(temp->keys[childIndex] > ln->data[i])) {
 						cerr << temp->keys[childIndex] <<" > " << ln->data[i] << "?" << endl;
 							/*!(ln->data[i] > temp->keys[childIndex])) {*/
@@ -332,7 +300,6 @@ bool BTree<E>::validate(Node *current) const {
 						return false;
 					}
 				}
-				
 			}
 			
 		}
