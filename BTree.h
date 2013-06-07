@@ -10,6 +10,7 @@ using namespace std;
 class BTreeEmptyException;
 class BTreeInternalException;
 
+
 template <typename E> 
 class BTree : public Container<E> {
 
@@ -26,6 +27,7 @@ class BTree : public Container<E> {
 			}
 			virtual ~Node() {}
 			virtual bool isLeafNode() = 0;
+			virtual void recursivelyDelete() = 0;
 			virtual void print(ostream&o = cerr, int depth = 0) = 0;
 	};
 	class InnerNode : public Node {
@@ -45,9 +47,6 @@ class BTree : public Container<E> {
 			}
 			~InnerNode(){
 				cerr << "[InnerNode::~] destructing Inner node..." << endl;
-				for (int i = 0; i < sizeChildren; i++) {
-					delete children[i];
-				}
 				sizeChildren = 0;
 				sizeKeys = 0;
 				delete [] keys;
@@ -55,7 +54,24 @@ class BTree : public Container<E> {
 				children = 0;
 				keys = 0;
 			}
+			void recursivelyDelete() {
+				cerr << "[InnerNode::~] destructing Inner node..." << endl;
+				for (int i = 0; i < sizeChildren; i++) {
+					children[i]->recursivelyDelete();
+				}
+				sizeChildren = 0;
+				sizeKeys = 0;
+				delete [] keys;
+				delete [] children;
+				/*if (this->parent) {*/
+				/*delete this->parent;*/
+				/*this->parent = 0;*/
+				/*}*/
+				children = 0;
+				keys = 0;
+			}
 			void init() {
+				this->parent = 0;
 				sizeChildren = 0;
 				sizeKeys = 0;
 			}
@@ -122,7 +138,6 @@ class BTree : public Container<E> {
 	class LeafNode : public Node {
 		public:
 			E *data;
-			Node *next;
 			int size;
 			LeafNode(Node *pt, int o): Node(pt, o) {
 				size = 0;
@@ -130,6 +145,15 @@ class BTree : public Container<E> {
 			}
 			~LeafNode() {
 				cerr << "[~] destructing Leaf node..." << endl;
+				delete [] data;
+				data = 0;
+			}	
+			void recursivelyDelete() {
+				cerr << "[~] destructing Leaf node..." << endl;
+				/*if (this->parent) {*/
+				/*delete this->parent;*/
+				/*this->parent = 0;*/
+				/*}*/
 				delete [] data;
 			}	
 			bool addData(const E &e) {
@@ -233,7 +257,14 @@ class BTreeInternalException : public ContainerException {
 
 template <typename E> 
 BTree<E>::BTree(int o = 8): order(o){
-	root = new LeafNode(0, o);
+	root = 0;
+}
+
+template <typename E> 
+BTree<E>::~BTree(){
+	cerr << "[~] calling destructor..." << endl;
+	cerr << "destructing root" << endl;
+	root->recursivelyDelete();
 }
 
 template <typename E> 
@@ -289,64 +320,43 @@ bool BTree<E>::validate(Node *current) const {
 	
 }
 
-/*template <typename E> */
-/*bool BTree<E>::validateParents(Node *current) const {*/
-/*if (!current->isLeafNode()) {*/
-/*for (int i = 0; i < current->sizeChildren; i++) {*/
-/*if (current == current->children[i]->parent)*/
-/*return false;*/
-/*}*/
-/*}*/
-/*}*/
-
-template <typename E> 
-BTree<E>::~BTree(){
-	cerr << "[~] calling destructor..." << endl;
-	delete root;
-}
-
 template <typename E> 
 void BTree<E>::add(const E& e) {
 	cerr << "[BTree::add] adding " << e << endl;;
+	if (!root) {
+		root = new LeafNode(0,order);
+	}
 	if (root->isLeafNode()) {
 		cerr << "[BTree::add] into root (leaf) node..." << endl;;
-		LeafNode *newRoot = static_cast<LeafNode*>(root);
-		if (newRoot->addData(e)) {
+		if (static_cast<LeafNode*>(root)->addData(e)) {
 			// Root Node is not full, easiest case
-			root = newRoot;
 			return;
 		} else {
 			// Root Node is full
-			// check if element already in node
-			for (int i = 0; i < newRoot->size; i++) {
-				cerr << e << " == " << newRoot->data[i] << endl;
-				if (e == newRoot->data[i])
-					return;
-			}
-			cerr << "[BTree::add] splitting nodes... " << endl;
+			cerr << "[BTree::add] splitting node... " << endl;
 			cerr << "[BTree::add] creating new nodes..." << endl;
 			LeafNode *right = new LeafNode(0, order);
 			LeafNode *left = new LeafNode(0, order);
 			cerr << "[BTree::add] populating new nodes..." << endl;
-			int stop = e > newRoot->data[order] ? order+1 : order;
+			int stop = e > static_cast<LeafNode*>(root)->data[order] ? order+1 : order;
 			for (int i = 0; i < stop; i++) {
-				left->data[i] = newRoot->data[i];
+				left->data[i] = static_cast<LeafNode*>(root)->data[i];
 				left->size++;
 			}
 			for (int i = stop; i < order*2+1; i++) {
-				right->data[i-stop] = newRoot->data[i];
+				right->data[i-stop] = static_cast<LeafNode*>(root)->data[i];
 				right->size++;
 			}
+			delete root;
+			root = 0;
 			stop == order ? left->addData(e) : right->addData(e);
 			cerr << "[BTree::add] connecting new nodes to new root..." << endl;
-			InnerNode *newRoot = new InnerNode(0, order);
-			newRoot->children[0] = left;
-			newRoot->children[1] = right;
-			newRoot->keys[0] = right->data[0];
-			newRoot->sizeChildren = 2;
-			newRoot->sizeKeys = 1;
-			delete root;
-			root = newRoot;
+			root = new InnerNode(0, order);
+			static_cast<InnerNode*>(root)->children[0] = left;
+			static_cast<InnerNode*>(root)->children[1] = right;
+			static_cast<InnerNode*>(root)->keys[0] = right->data[0];
+			static_cast<InnerNode*>(root)->sizeChildren = 2;
+			static_cast<InnerNode*>(root)->sizeKeys = 1;
 			left->parent = root;
 			right->parent = root;
 			cerr << "[BTree::add] done, returning" << endl;
@@ -453,9 +463,7 @@ void BTree<E>::add(const E& e) {
 			overflow = static_cast<InnerNode*>(currentInner->children[order*2]);
 			currentInner->sizeChildren--;
 			currentInner->sizeKeys--;
-			cerr << "is the error here?" << endl;
 			currentInner->insertInnerNode(newRight, insertKey);
-			/*insertKey = overflow->keys[0];*/
 			insertKey = findInsertKey(overflow);
 		}
 
@@ -505,6 +513,7 @@ void BTree<E>::add(const E e[], size_t s) {
 
 template <typename E> 
 void BTree<E>::remove(const E& e){
+	if (!root) return;
 	Node *current = root;
 	cerr << "[BTree::remove] looking up appropriate node to find " << e << endl;
 	int parent_index = 0;
@@ -521,6 +530,11 @@ void BTree<E>::remove(const E& e){
 	LeafNode* temp = static_cast<LeafNode*>(current);
 	cerr << "[BTree::remove] found, calling LeafNode::remove()..." << endl;
 	temp->remove(e);
+
+	if (root->isLeafNode() && static_cast<LeafNode*>(root)->size == 0) {
+		delete root;
+		root = 0;
+	}
 
 	if (temp->size >= order || !temp->parent) {
 		// no underflows
@@ -568,8 +582,8 @@ void BTree<E>::remove(const E& e){
 	for (i = 0; i < temp->size; i++) {
 		add(temp->data[i]);
 	}
-	// TODO this causes a segment fault for some reason...
 	delete temp;
+	temp = 0;
 
 	// done, now check if the parent node is underflowing
 	InnerNode *curr = parent;
@@ -608,12 +622,10 @@ void BTree<E>::remove(const E& e){
 			curr->children[curr->sizeChildren++] = rightSibling->children[0];
 			curr->children[curr->sizeChildren-1]->parent = curr;
 			parent->keys[parent_index] = rightSibling->keys[0];
+
 			// delete old node out of right sibling
-			cerr << "ok" << endl;
 			for (int i = 0; i < rightSibling->sizeKeys-1; i++) {
-				cerr <<"rightSibling->children["<<i<<"] = rightSibling->children["<<i+1<<"]"<<endl;
 				rightSibling->children[i] = rightSibling->children[i+1];
-				cerr <<"rightSibling->keys["<<i<<"] = rightSibling->keys["<<i+1<<"]"<<endl;
 				rightSibling->keys[i] = rightSibling->keys[i+1];
 			}
 			rightSibling->children[rightSibling->sizeKeys-1] = rightSibling->children[rightSibling->sizeKeys];
@@ -630,6 +642,7 @@ void BTree<E>::remove(const E& e){
 			cerr << "[BTree::remove] merging with right sibling..." << endl;
 			InnerNode *rightSibling = static_cast<InnerNode*>(parent->children[parent_index+1]);
 			curr->insertInnerNode(static_cast<InnerNode*>(rightSibling->children[0]),parent->keys[parent_index]);
+			
 			// insert elements of right sibling into this node
 			int i = 1;
 			while (i < rightSibling->sizeKeys) {
@@ -638,7 +651,6 @@ void BTree<E>::remove(const E& e){
 				curr->children[curr->sizeChildren-1]->parent = curr;
 				i++;
 			}
-			cerr << "before" << endl;
 			curr->keys[curr->sizeKeys++] = rightSibling->keys[i-1];
 			curr->children[curr->sizeChildren++] = rightSibling->children[rightSibling->sizeKeys];
 			curr->children[curr->sizeChildren-1]->parent = curr;
@@ -650,10 +662,11 @@ void BTree<E>::remove(const E& e){
 				parent->keys[i] = parent->keys[i+1];
 				i++;
 			}
-			parent->children[i+1] = parent->children[i+2];
+			/*parent->children[i+1] = parent->children[i+2];*/
 			parent->sizeKeys--;
 			parent->sizeChildren--;
-			/*delete rightSibling;*/
+			delete rightSibling;
+			rightSibling = 0;
 		}
 		// if left sibling, put all currs elements there
 		else if (parent_index > 0) {
@@ -670,16 +683,15 @@ void BTree<E>::remove(const E& e){
 			
 			// delete old key from parent node
 			int i = parent_index;
-			cerr << "paarent index: " << parent_index << endl;
 			while (i < parent->sizeKeys) {
-				cerr << "assign parent->children["<<i<<"] = parent->children["<<i+1<<"]"<<endl;
 				parent->children[i] = parent->children[i+1];
-				cerr << "assign parent->keys["<<i<<"] = parent->keys["<<i+1<<"]"<<endl;
 				parent->keys[i-1] = parent->keys[i];
 				i++;
 			}
 			parent->sizeKeys--;
 			parent->sizeChildren--;
+			delete curr;
+			curr = 0;
 		} 
 		// done, continue with parent of parent
 		curr = parent;
@@ -687,6 +699,7 @@ void BTree<E>::remove(const E& e){
 	}
 	if (!parent and curr->sizeKeys == 0) {
 		root = curr->children[0];
+		delete root->parent;
 		root->parent = 0;
 	}
 	cerr << "[BTree::remove] done, returning" << endl;
@@ -703,6 +716,7 @@ void BTree<E>::remove(const E e[], size_t s){
 
 template <typename E> 
 bool BTree<E>::member(const E& e ) const{
+	if (!root) return false;
 	cerr << "[member] " << e << "?";
 	Node *current = root;
 	while (!current->isLeafNode()) {
@@ -726,6 +740,7 @@ bool BTree<E>::member(const E& e ) const{
 
 template <typename E> 
 size_t BTree<E>::size() const{
+	if (!root) return 0;
 	size_t i = 0;
 	size_(root, i);
 	return i;
@@ -745,11 +760,12 @@ void BTree<E>::size_(Node *current, size_t &n) const{
 
 template <typename E> 
 bool BTree<E>::empty() const{
-	return size() == 0;
+	return (!root || size() == 0);
 }
 
 template <typename E> 
 size_t BTree<E>::apply( const Functor<E>& f, Order o = dontcare ) const{
+	if (!root) return 0;
 	size_t i = 0;
 	if (root->isLeafNode()) {
 		applyLeaf_(f, o, static_cast<LeafNode*>(root), i);
@@ -815,7 +831,7 @@ bool BTree<E>::applyLeaf_( const Functor<E>& f, Order o, LeafNode *current, size
 
 template <typename E> 
 E BTree<E>::min() const{
-	if (size() == 0) throw BTreeEmptyException();
+	if (!root || size() == 0) throw BTreeEmptyException();
 	return min_(root);
 }
 
@@ -830,7 +846,7 @@ E BTree<E>::min_(Node *current) const{
 
 template <typename E>
 E BTree<E>::max() const{
-	if (size() == 0) throw BTreeEmptyException();
+	if (!root || size() == 0) throw BTreeEmptyException();
 	return (max_(root));
 }
 
@@ -845,7 +861,7 @@ E BTree<E>::max_(Node* current) const{
 
 template <typename E>
 std::ostream& BTree<E>::print(std::ostream &o) const{
-	root->print(o);
+	if (root) root->print(o);
 	return o;
 }
 
