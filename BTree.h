@@ -155,6 +155,7 @@ class BTree : public Container<E> {
 				/*this->parent = 0;*/
 				/*}*/
 				delete [] data;
+				data = 0;
 			}	
 			bool addData(const E &e) {
 				int i = 0;
@@ -220,6 +221,7 @@ class BTree : public Container<E> {
 	public:
 		BTree(int);
 		virtual ~BTree();
+		virtual void delete_(Node* current);
 
 		virtual void add(const E& e);
 		virtual void add(const E e[], size_t s);
@@ -264,7 +266,26 @@ template <typename E>
 BTree<E>::~BTree(){
 	cerr << "[~] calling destructor..." << endl;
 	cerr << "destructing root" << endl;
-	root->recursivelyDelete();
+	/*if (root) {*/
+	/*root->recursivelyDelete();*/
+	/*root = 0;*/
+	/*}*/
+	delete_(root);
+}
+
+template <typename E> 
+void BTree<E>::delete_(Node* current){
+	if (current) {
+		if (current->isLeafNode()) {
+			delete current;
+			return;
+		} else {
+			for (int i = 0; i < static_cast<InnerNode*>(current)->sizeChildren; i++) {
+				delete_(static_cast<InnerNode*>(current)->children[i]);
+			}
+			delete current;
+		}
+	}
 }
 
 template <typename E> 
@@ -760,7 +781,7 @@ void BTree<E>::size_(Node *current, size_t &n) const{
 
 template <typename E> 
 bool BTree<E>::empty() const{
-	return (!root || size() == 0);
+	return (size() == 0);
 }
 
 template <typename E> 
