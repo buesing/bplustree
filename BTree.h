@@ -10,7 +10,6 @@ using namespace std;
 class BTreeEmptyException;
 class BTreeInternalException;
 
-
 template <typename E> 
 class BTree : public Container<E> {
 
@@ -44,8 +43,7 @@ class BTree : public Container<E> {
 				keys = new E[o*2];
 				children = new Node*[o*2+1];
 			}
-			~InnerNode(){
-				cerr << "[InnerNode::~] destructing Inner node..." << endl;
+			~InnerNode() {
 				sizeChildren = 0;
 				sizeKeys = 0;
 				delete [] keys;
@@ -60,50 +58,32 @@ class BTree : public Container<E> {
 			}
 			bool insertLeafNode(LeafNode* n) {
 				if (sizeChildren < this->nodeOrder*2+1) {
-					cerr << "[InnerNode::insertLeafNode] inserting... with key "<<  n->data[0] << endl;
 					int at = 0;
-					while (sizeKeys != at and n->data[0] > keys[at]) {
-						at++;
-					}
-					for (int i = sizeKeys; i > at ; i--) {
-						keys[i] = keys[i-1];
-					}
+					while (sizeKeys != at and n->data[0] > keys[at]) at++;
+					for (int i = sizeKeys; i > at ; i--) keys[i] = keys[i-1];
 					keys[at] = n->data[0];
 					at++;
-					for (int i = sizeChildren; i > at; i--) {
-						children[i] = children[i-1];
-					}
+					for (int i = sizeChildren; i > at; i--) children[i] = children[i-1];
 					children[at] = n;
 					sizeKeys++;
 					sizeChildren++;
 					return true;
-				} else {
-					return false;
-				}
+				} else return false;
 			}
 			bool insertInnerNode(InnerNode* n, E& key) {
 				if (sizeChildren < this->nodeOrder*2+1) {
 					n->parent = this;
-					cerr << "[InnerNode::insertInnerNode] inserting..." << endl;
 					int at = 0;
-					while (sizeKeys != at and !(keys[at] > key)) {
-						at++;
-					}
-					for (int i = sizeKeys; i > at ; i--) {
-						keys[i] = keys[i-1];
-					}
+					while (sizeKeys != at and !(keys[at] > key)) at++;
+					for (int i = sizeKeys; i > at ; i--) keys[i] = keys[i-1];
 					keys[at] = key;
 					at++;
-					for (int i = sizeChildren; i > at; i--) {
-						children[i] = children[i-1];
-					}
+					for (int i = sizeChildren; i > at; i--) children[i] = children[i-1];
 					children[at] = n;
 					sizeKeys++;
 					sizeChildren++;
 					return true;
-				} else {
-					return false;
-				}
+				} else return false;
 			}
 			void print(ostream &o = cerr, int depth = 0) {
 				o << std::string(depth*4, '-') << "[print] Inner Node" << endl;
@@ -127,24 +107,17 @@ class BTree : public Container<E> {
 				data = new E[o*2+1];
 			}
 			~LeafNode() {
-				cerr << "[~] destructing Leaf node..." << endl;
 				delete [] data;
 				data = 0;
 			}	
 			bool addData(const E &e) {
 				int i = 0;
 				while (i < size and !(data[i] > e)) {
-					if (e == data[i]) {
-						cerr << "[BTree::add] already in node" << endl;
-						return true;
-					}
+					if (e == data[i]) return true;
 					i++;
 				}
-				if (size == this->nodeOrder*2+1)
-					return false;
-				for (int s = size; s > i; s--) {
-					data[s] = data[s-1];
-				}
+				if (size == this->nodeOrder*2+1) return false;
+				for (int s = size; s > i; s--) data[s] = data[s-1];
 				data[i] = e;
 				size++;
 				return true;
@@ -157,27 +130,17 @@ class BTree : public Container<E> {
 			}
 			void remove(const E& key) {
 				int i = 0;
-				cerr << "[LeafNode::remove] looking for element..." << endl;
-				while (i < size and !(data[i] == key)) {
-					i++;
-				}
-				if (i == size) {
-					cerr << "[LeafNode::remove] element is not in here!" << endl;
-					return;
-				}
-				cerr << "[LeafNode::remove] found!" << endl;
+				while (i < size and !(data[i] == key)) i++;
+				if (i == size) return;
 				if (i == size-1) {
-					cerr << "[LeafNode::remove] removing last element..." << endl;
 					size--;
 					return;
 				}
-				cerr << "[LeafNode::remove] removing element..." << endl;
 				while (i < size-1) {
 					data[i] = data[i+1];
 					i++;
 				}
 				size--;
-				cerr << "[LeafNode::remove] done, returning" << endl;
 				return;
 			}
 			void print(ostream& o = cerr, int depth = 0) {
@@ -189,33 +152,35 @@ class BTree : public Container<E> {
 				}
 				o << endl;
 			}
-	};
-	// END SUBCLASS NODE
+	}; // END SUBCLASS NODE
 	
 	public:
 		BTree(int);
 		virtual ~BTree();
-		virtual void delete_(Node* current);
-
 		virtual void add(const E& e);
 		virtual void add(const E e[], size_t s);
 		virtual void remove(const E& e);
 		virtual void remove(const E e[], size_t s);
-		virtual bool member(const E& e ) const;
+		virtual bool member(const E& e) const;
 		virtual size_t size() const;
 		virtual void size_(Node* current, size_t &n) const;
 		virtual bool empty() const;
-		virtual size_t apply( const Functor<E>& f, Order order) const;
-		virtual bool applyInner_( const Functor<E>& f, Order order, InnerNode* current, size_t &n) const;
-		virtual bool applyLeaf_( const Functor<E>& f, Order order, LeafNode* current, size_t &n) const;
+		virtual size_t apply(const Functor<E>& f, Order order) const;
 		virtual E min() const;
 		virtual E max() const;
-		virtual E min_(Node* current) const;
-		virtual E max_(Node* current) const;
 		virtual std::ostream& print(std::ostream &o) const;
+	private:
+		virtual void delete_(Node* current);
+		virtual bool applyInnerAsc(const Functor<E>& f, InnerNode* current, size_t &n) const;
+		virtual bool applyInnerDesc(const Functor<E>& f, InnerNode* current, size_t &n) const;
+		virtual bool applyLeafAsc(const Functor<E>& f, LeafNode* current, size_t &n) const;
+		virtual bool applyLeafDesc(const Functor<E>& f, LeafNode* current, size_t &n) const;
 		bool validate(Node* current) const;
 		E& findInsertKey(Node* current) const;
 		int order;
+		size_t items;
+		E minimum;
+		E maximum;
 		Node *root;
 };
 
@@ -227,18 +192,21 @@ class BTreeEmptyException : public ContainerException {
 class BTreeInternalException : public ContainerException {
 	const char * w;
 	public:
-	explicit BTreeInternalException( const char * w ) throw() : w(w) {}
+	explicit BTreeInternalException(const char * w) throw() : w(w) {}
 	virtual const char * what() const throw() { return w; }
 };
 
 template <typename E> 
 BTree<E>::BTree(int o = 8): order(o){
+	// actual allocations begins in add()
 	root = 0;
+	items = 0;
+	minimum = E();
+	maximum = E();
 }
 
 template <typename E> 
 BTree<E>::~BTree(){
-	cerr << "[~] calling destructor..." << endl;
 	delete_(root);
 }
 
@@ -259,28 +227,19 @@ void BTree<E>::delete_(Node* current){
 
 template <typename E> 
 E& BTree<E>::findInsertKey(Node *current) const {
-	if (!current->isLeafNode()) {
-		return (findInsertKey(static_cast<InnerNode*>(current)->children[0]));
-	} else {
-		return (static_cast<LeafNode*>(current)->data[0]);
-	}
+	if (!current->isLeafNode()) return (findInsertKey(static_cast<InnerNode*>(current)->children[0]));
+	else return (static_cast<LeafNode*>(current)->data[0]);
 }
+
 template <typename E> 
 bool BTree<E>::validate(Node *current) const {
 	if (!current->isLeafNode()) {
 		InnerNode* temp = static_cast<InnerNode*>(current);
-		if (temp->parent && temp->sizeKeys < order) {
-			cerr << "order wrong" << endl;
-			return false;
-		}
-		if (temp->sizeKeys != temp->sizeChildren-1) {
-			cerr << "children != keys " << endl;
-			return false;
-		}
+		if (temp->parent && temp->sizeKeys < order) return false;
+		if (temp->sizeKeys != temp->sizeChildren-1) return false;
 		if (!temp->children[0]->isLeafNode()) {
 			for (int i = 0; i < temp->sizeChildren; i++) {
 				if (!(static_cast<InnerNode*>(static_cast<InnerNode*>(temp->children[i])->parent)->keys[0] == temp->keys[0])) {
-					cerr << "parent wrong" << endl;
 					return false;
 				}
 				return (validate(temp->children[i]));
@@ -289,43 +248,35 @@ bool BTree<E>::validate(Node *current) const {
 			for (int childIndex = 0; childIndex < temp->sizeKeys-1; childIndex++) {
 				LeafNode* ln = static_cast<LeafNode*>(temp->children[childIndex]);
 				for (int i = 0; i < ln->size; i++) {
-					if (!(temp->keys[childIndex] > ln->data[i])) {
-						cerr << temp->keys[childIndex] <<" > " << ln->data[i] << "?" << endl;
-							/*!(ln->data[i] > temp->keys[childIndex])) {*/
+					if (!(temp->keys[childIndex] > ln->data[i])) return false;
+					if (temp->parent and temp->keys[0] == static_cast<InnerNode*>(temp->parent)->keys[childIndex])
 						return false;
-					}
-					if (temp->parent and temp->keys[0] == static_cast<InnerNode*>(temp->parent)->keys[childIndex]) {
-						cerr << "key equals first element..." << endl;
-
-						return false;
-					}
 				}
 			}
-			
 		}
 	}
 	return true;
-	
 }
 
 template <typename E> 
 void BTree<E>::add(const E& e) {
-	cerr << "[BTree::add] adding " << e << endl;;
 	if (!root) {
 		root = new LeafNode(0,order);
+		minimum = e;
+		maximum = e;
 	}
+	if (minimum > e)
+		minimum = e;
+	if (e > maximum)
+		maximum = e;
 	if (root->isLeafNode()) {
-		cerr << "[BTree::add] into root (leaf) node..." << endl;;
 		if (static_cast<LeafNode*>(root)->addData(e)) {
 			// Root Node is not full, easiest case
 			return;
 		} else {
 			// Root Node is full
-			cerr << "[BTree::add] splitting node... " << endl;
-			cerr << "[BTree::add] creating new nodes..." << endl;
 			LeafNode *right = new LeafNode(0, order);
 			LeafNode *left = new LeafNode(0, order);
-			cerr << "[BTree::add] populating new nodes..." << endl;
 			int stop = e > static_cast<LeafNode*>(root)->data[order] ? order+1 : order;
 			for (int i = 0; i < stop; i++) {
 				left->data[i] = static_cast<LeafNode*>(root)->data[i];
@@ -338,7 +289,6 @@ void BTree<E>::add(const E& e) {
 			delete root;
 			root = 0;
 			stop == order ? left->addData(e) : right->addData(e);
-			cerr << "[BTree::add] connecting new nodes to new root..." << endl;
 			root = new InnerNode(0, order);
 			static_cast<InnerNode*>(root)->children[0] = left;
 			static_cast<InnerNode*>(root)->children[1] = right;
@@ -347,13 +297,11 @@ void BTree<E>::add(const E& e) {
 			static_cast<InnerNode*>(root)->sizeKeys = 1;
 			left->parent = root;
 			right->parent = root;
-			cerr << "[BTree::add] done, returning" << endl;
 			return;
 		}
 	}
 
 	Node *current = root;
-	cerr << "[BTree::add] looking up appropriate node..." << endl;
 	int parent_index = 0;
 	while (!current->isLeafNode()) {
 		parent_index = 0;
@@ -367,13 +315,8 @@ void BTree<E>::add(const E& e) {
 
 	// found node, check if element already in there
 	LeafNode* temp = static_cast<LeafNode*>(current);
-	cerr << "[BTree::add] node found, attempting to insert..." << endl;
-	if (temp->addData(e)) {
-		cerr << "[BTree::add] inserted, returning" << endl;
-		return;
-	}
+	if (temp->addData(e)) return;
 
-	cerr << "[BTree::add] node full, splitting nodes..." << endl;
 	LeafNode* insertNode = new LeafNode(temp->parent, order);
 
 	E dataOverflow;
@@ -395,15 +338,11 @@ void BTree<E>::add(const E& e) {
 	InnerNode* currentInner = static_cast<InnerNode*>(temp->parent);
 
 	if (currentInner->insertLeafNode(insertNode)) {
-		cerr << "[BTree::add] split leaf nodes, no further splits neccessary." << endl;
-		cerr << "[BTree::add] insert successful, returning" << endl;
 		return;
 	}
 
-	cerr << "[BTree::add] parent node full, splitting inner node..." << endl;
-	// strange technique: add element into node, save overflow ( lastt element)
+	// strange technique: add element into node, save overflow (last element)
 	// then split nodes in middle
-
 	LeafNode* overflow;
 	if (insertNode->data[0] > static_cast<LeafNode*>(currentInner->children[order*2])->data[0]) {
 		overflow = insertNode;
@@ -439,10 +378,8 @@ void BTree<E>::add(const E& e) {
 	while (currentInner->parent) {
 		currentInner = static_cast<InnerNode*>(currentInner->parent);
 		if (currentInner->insertInnerNode(newRight, insertKey)) {
-			cerr << "[BTee::add] inserted into node, done" << endl;
 			return;
 		}
-		cerr << "[BTree::add] next parent node full, splitting..." << endl;
 		// else split this node, this time with inner nodes
 		InnerNode* overflow;
 		if (newRight->keys[0] > currentInner->keys[order*2-1]) {
@@ -468,7 +405,6 @@ void BTree<E>::add(const E& e) {
 		newRight->children[order]->parent = newRight;
 		newRight->keys[order-1] = insertKey;
 
-
 		newRight->sizeKeys = order;
 		newRight->sizeChildren = order+1;
 
@@ -477,7 +413,6 @@ void BTree<E>::add(const E& e) {
 		insertKey = currentInner->keys[order];
 	}
 
-	cerr << "[BTree::add] root split, inserting with key = " << insertKey << "..." << endl;
 	InnerNode* newRoot = new InnerNode(0, order);
 	newRoot->keys[0] = insertKey;
 	newRoot->children[0] = currentInner;
@@ -487,7 +422,6 @@ void BTree<E>::add(const E& e) {
 	currentInner->parent = newRoot;
 	newRight->parent = newRoot;
 	root = newRoot;
-	cerr << "[BTree::add] created new root node, returning" << endl;
 	return;
 }
 
@@ -496,14 +430,12 @@ void BTree<E>::add(const E e[], size_t s) {
 	for (unsigned i = 0; i < s; i++) {
 		add(e[i]);
 	}
-	
 }
 
 template <typename E> 
 void BTree<E>::remove(const E& e){
 	if (!root) return;
 	Node *current = root;
-	cerr << "[BTree::remove] looking up appropriate node to find " << e << endl;
 	int parent_index = 0;
 	while (!current->isLeafNode()) {
 		parent_index = 0;
@@ -516,48 +448,53 @@ void BTree<E>::remove(const E& e){
 	}
 	// found node, check if element in there
 	LeafNode* temp = static_cast<LeafNode*>(current);
-	cerr << "[BTree::remove] found, calling LeafNode::remove()..." << endl;
 	temp->remove(e);
-
+	
+	// if tree is empty now delete root
 	if (root->isLeafNode() && static_cast<LeafNode*>(root)->size == 0) {
 		delete root;
 		root = 0;
+		minimum = E();
+		maximum = E();
+		return;
 	}
 
+	// update min/max if neccessary
+	if (minimum == e) {
+		minimum = temp->data[0];
+	}
+	if (maximum == e) {
+		maximum = temp->data[temp->size-1];
+	}
+	
+	// if no underflows, return
 	if (temp->size >= order || !temp->parent) {
-		// no underflows
-		// or
-		// this is the root node, so underflows are okay
 		return;
 	}
 	
-	// now we have an underflow and we are not working on the root node.
-	cerr << "[BTree::remove] underflow, attempting rebuild..." << endl;
+	// now we have an underflow and we are not working on the root node, so a rebuild is neccessary
+	// try borrowing element from left sibling
 	InnerNode* parent = static_cast<InnerNode*>(temp->parent);
 	if (parent_index != 0 && static_cast<LeafNode*>(parent->children[parent_index-1])->size > order) {
-		cerr << "[BTree::remove] attempting to borrow element from left sibling..." << endl;
 		LeafNode *leftSibling = static_cast<LeafNode*>(parent->children[parent_index-1]);
 		temp->addData(leftSibling->data[--leftSibling->size]);
 		parent->keys[parent_index-1] = temp->data[0];
-		cerr << "[BTree::remove] done, returning" << endl;
 		return;
 	}
+
+	// try borrowing element from right sibling
 	if (parent_index < parent->sizeKeys && static_cast<LeafNode*>(parent->children[parent_index+1])->size > order) {
-		cerr << "[BTree::remove] attempting to borrow element from right sibling..." << endl;
 		LeafNode *rightSibling = static_cast<LeafNode*>(parent->children[parent_index+1]);
 		temp->addData(rightSibling->data[0]);
 		rightSibling->remove(rightSibling->data[0]);
 		parent->keys[parent_index] = rightSibling->data[0];
-		cerr << "[BTree::remove] done, returning" << endl;
 		return;
 	}
 
-	cerr << "[BTree::remove] merging with siblings..." << endl;
+	// else delete node and insert its elements
 	// remove key from parent node
 	int i = parent_index;
-	cerr << "[BTree::remove] removing obsolete key from parent..." << endl;
 	while (i < parent->sizeKeys && i+1 < order*2) {
-		cerr << i << endl;
 		parent->children[i] = parent->children[i+1];
 		parent->keys[i] = parent->keys[i+1];
 		i++;
@@ -565,8 +502,8 @@ void BTree<E>::remove(const E& e){
 	parent->children[i] = parent->children[i+1];
 	parent->sizeChildren--;
 	parent->sizeKeys--;
+
 	// node is now deleted, now insert remaining elements
-	cerr << "[BTree::remove] adding remaining elements..." << endl;
 	for (i = 0; i < temp->size; i++) {
 		add(temp->data[i]);
 	}
@@ -582,7 +519,6 @@ void BTree<E>::remove(const E& e){
 			parent_index++;
 
 		if (parent_index != 0 && static_cast<InnerNode*>(parent->children[parent_index-1])->sizeKeys > order) {
-			cerr << "[BTree::remove] borrowing node from left sibling..." << endl;
 			InnerNode *leftSibling = static_cast<InnerNode*>(parent->children[parent_index-1]);
 
 			// insert rightmost node of left sibling at beginning
@@ -600,11 +536,9 @@ void BTree<E>::remove(const E& e){
 			leftSibling->sizeKeys--;
 
 			parent->keys[parent_index-1] = leftSibling->keys[leftSibling->sizeKeys];
-			cerr << "[BTree::remove] done, returning" << endl;
 			return;
 		}
 		if (parent_index < parent->sizeKeys && static_cast<InnerNode*>(parent->children[parent_index+1])->sizeKeys > order) {
-			cerr << "[BTree::remove] borrowing node from right sibling..." << endl;
 			InnerNode *rightSibling = static_cast<InnerNode*>(parent->children[parent_index+1]);
 			curr->keys[curr->sizeKeys++] = parent->keys[parent_index];
 			curr->children[curr->sizeChildren++] = rightSibling->children[0];
@@ -619,15 +553,12 @@ void BTree<E>::remove(const E& e){
 			rightSibling->children[rightSibling->sizeKeys-1] = rightSibling->children[rightSibling->sizeKeys];
 			rightSibling->sizeChildren--;
 			rightSibling->sizeKeys--;
-			cerr << "[BTree::remove] done, returning" << endl;
 			return;
 		}
 
-		cerr << "[BTree::remove] attempting to merge node with siblings..." << endl;
 
 		// if right sibling, put all their elements into curr
 		if (parent_index < parent->sizeKeys) {
-			cerr << "[BTree::remove] merging with right sibling..." << endl;
 			InnerNode *rightSibling = static_cast<InnerNode*>(parent->children[parent_index+1]);
 			curr->insertInnerNode(static_cast<InnerNode*>(rightSibling->children[0]),parent->keys[parent_index]);
 			
@@ -645,12 +576,10 @@ void BTree<E>::remove(const E& e){
 			// delete old key from parent node
 			i = parent_index;
 			while (i < parent->sizeKeys-1) {
-				cerr << i << endl;
 				parent->children[i+1] = parent->children[i+2];
 				parent->keys[i] = parent->keys[i+1];
 				i++;
 			}
-			/*parent->children[i+1] = parent->children[i+2];*/
 			parent->sizeKeys--;
 			parent->sizeChildren--;
 			delete rightSibling;
@@ -658,10 +587,9 @@ void BTree<E>::remove(const E& e){
 		}
 		// if left sibling, put all currs elements there
 		else if (parent_index > 0) {
-			// put as many nodes as possible in left sibling
-			cerr << "[BTree::remove] merging with left sibling..." << endl;
-			InnerNode *leftSibling = static_cast<InnerNode*>(parent->children[parent_index-1]);
 
+			// put as many nodes as possible in left sibling
+			InnerNode *leftSibling = static_cast<InnerNode*>(parent->children[parent_index-1]);
 			leftSibling->insertInnerNode(static_cast<InnerNode*>(curr->children[0]), parent->keys[parent_index-1]);
 			for (int i = 0; i < curr->sizeKeys; i++) {
 				leftSibling->keys[leftSibling->sizeKeys++] = curr->keys[i];
@@ -690,7 +618,6 @@ void BTree<E>::remove(const E& e){
 		delete root->parent;
 		root->parent = 0;
 	}
-	cerr << "[BTree::remove] done, returning" << endl;
 	return;
 }
 
@@ -703,9 +630,8 @@ void BTree<E>::remove(const E e[], size_t s){
 }
 
 template <typename E> 
-bool BTree<E>::member(const E& e ) const{
+bool BTree<E>::member(const E& e) const{
 	if (!root) return false;
-	cerr << "[member] " << e << "?";
 	Node *current = root;
 	while (!current->isLeafNode()) {
 		InnerNode* temp = static_cast<InnerNode*>(current);
@@ -718,11 +644,9 @@ bool BTree<E>::member(const E& e ) const{
 	LeafNode* temp = static_cast<LeafNode*>(current);
 	for (int i = 0; i < temp->size; i++) {
 		if (temp->data[i] == e) {
-			cerr << " yes" << endl;
 			return true;
 		}
 	}
-	cerr << " no!" << endl;
 	return false;
 }
 
@@ -752,104 +676,91 @@ bool BTree<E>::empty() const{
 }
 
 template <typename E> 
-size_t BTree<E>::apply( const Functor<E>& f, Order o = dontcare ) const{
+size_t BTree<E>::apply(const Functor<E>& f, Order o = dontcare) const {
 	if (!root) return 0;
 	size_t i = 0;
 	if (root->isLeafNode()) {
-		applyLeaf_(f, o, static_cast<LeafNode*>(root), i);
+		if (o == descending)
+			applyLeafDesc(f, static_cast<LeafNode*>(root), i);
+		else
+			applyLeafAsc(f, static_cast<LeafNode*>(root), i);
 	} else {
-		applyInner_(f, o, static_cast<InnerNode*>(root), i);
+		if (o == descending)
+			applyInnerDesc(f, static_cast<InnerNode*>(root), i);
+		else
+			applyInnerAsc(f, static_cast<InnerNode*>(root), i);
 	}
 	return i;
 }
 
 template <typename E> 
-bool BTree<E>::applyInner_( const Functor<E>& f, Order o, InnerNode *current, size_t &n ) const{
-	if (o == ascending) {
-		if (!current->children[0]->isLeafNode()) {
-			bool cont = true;
-			for (int i = 0; i < current->sizeChildren; i++) {
-				if (!cont) return false;
-				cont = applyInner_(f, o, static_cast<InnerNode*>(current->children[i]), n);
-			}
-		}
-		else {
-			bool cont = true;
-			for (int i = 0; i < current->sizeChildren; i++) {
-				if (!cont) return false;
-				cont = applyLeaf_(f, o, static_cast<LeafNode*>(current->children[i]), n);
-			}
-
+bool BTree<E>::applyInnerAsc(const Functor<E>& f, InnerNode *current, size_t &n) const {
+	if (!current->children[0]->isLeafNode()) {
+		bool cont = true;
+		for (int i = 0; i < current->sizeChildren; i++) {
+			if (!cont) return false;
+			cont = applyInnerAsc(f, static_cast<InnerNode*>(current->children[i]), n);
 		}
 	} else {
-		if (!current->children[0]->isLeafNode()) {
-			bool cont = true;
-			for (int i = current->sizeChildren-1; i >= 0; i--) {
-				if (!cont) return false;
-				cont = applyInner_(f, o, static_cast<InnerNode*>(current->children[i]), n);
-			}
+		bool cont = true;
+		for (int i = 0; i < current->sizeChildren; i++) {
+			if (!cont) return false;
+			cont = applyLeafAsc(f, static_cast<LeafNode*>(current->children[i]), n);
 		}
-		else {
-			bool cont = true;
-			for (int i = current->sizeChildren-1; i >= 0; i--) {
-				if (!cont) return false;
-				cont = applyLeaf_(f, o, static_cast<LeafNode*>(current->children[i]), n);
-			}
-
+	}
+	return true;
+}
+template <typename E> 
+bool BTree<E>::applyInnerDesc(const Functor<E>& f, InnerNode *current, size_t &n) const {
+	if (!current->children[0]->isLeafNode()) {
+		bool cont = true;
+		for (int i = current->sizeChildren-1; i >= 0; i--) {
+			if (!cont) return false;
+			cont = applyInnerDesc(f, static_cast<InnerNode*>(current->children[i]), n);
+		}
+	} else {
+		bool cont = true;
+		for (int i = current->sizeChildren-1; i >= 0; i--) {
+			if (!cont) return false;
+			cont = applyLeafDesc(f, static_cast<LeafNode*>(current->children[i]), n);
 		}
 	}
 	return true;
 }
 
 template <typename E> 
-bool BTree<E>::applyLeaf_( const Functor<E>& f, Order o, LeafNode *current, size_t &n ) const{
-	if (o == ascending) {
-		for (int i = 0; i < current->size; i++) {
-			n++;
-			if (!f(current->data[i])) return false;
-		}
-	} else {
-		for (int i = current->size-1; i >= 0; i--) {
-			n++;
-			if (!f(current->data[i])) return false;
-		}
+bool BTree<E>::applyLeafAsc(const Functor<E>& f, LeafNode *current, size_t &n) const {
+	for (int i = 0; i < current->size; i++) {
+		n++;
+		if (!f(current->data[i])) return false;
 	}
 	return true;
 }
 
 template <typename E> 
-E BTree<E>::min() const{
-	if (!root || size() == 0) throw BTreeEmptyException();
-	return min_(root);
+bool BTree<E>::applyLeafDesc(const Functor<E>& f, LeafNode *current, size_t &n) const {
+	for (int i = current->size-1; i >= 0; i--) {
+		n++;
+		if (!f(current->data[i])) return false;
+	}
+	return true;
 }
 
 template <typename E> 
-E BTree<E>::min_(Node *current) const{
-	if (!current->isLeafNode()) {
-		return (min_(static_cast<InnerNode*>(current)->children[0]));
-	} else {
-		return (static_cast<LeafNode*>(current)->data[0]);
-	}
+E BTree<E>::min() const {
+	if (!root) throw BTreeEmptyException();
+	return minimum;
 }
 
 template <typename E>
-E BTree<E>::max() const{
-	if (!root || size() == 0) throw BTreeEmptyException();
-	return (max_(root));
+E BTree<E>::max() const {
+	if (!root) throw BTreeEmptyException();
+	return maximum;
 }
 
 template <typename E>
-E BTree<E>::max_(Node* current) const{
-	if (!current->isLeafNode()) {
-		return (max_(static_cast<InnerNode*>(current)->children[static_cast<InnerNode*>(current)->sizeChildren-1]));
-	} else {
-		return (static_cast<LeafNode*>(current)->data[static_cast<LeafNode*>(current)->size-1]);
-	}
-}
-
-template <typename E>
-std::ostream& BTree<E>::print(std::ostream &o) const{
-	if (root) root->print(o);
+std::ostream& BTree<E>::print(std::ostream &o) const {
+	root->print(o);
 	return o;
 }
 
