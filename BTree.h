@@ -1,3 +1,8 @@
+// TODO:
+// implement size variable
+// quicker member?
+// quicker add?
+
 #ifndef BTREE_H
 #define BTREE_H
 
@@ -100,9 +105,11 @@ class BTree : public Container<E> {
 
 	class LeafNode : public Node {
 		public:
+			LeafNode *next;
+			LeafNode *prev;
 			E *data;
 			int size;
-			LeafNode(Node *pt, int o): Node(pt, o) {
+			LeafNode(Node *pt, int o, LeafNode* n, LeafNode* p): Node(pt, o), next(n), prev(p) {
 				size = 0;
 				data = new E[o*2+1];
 			}
@@ -163,7 +170,6 @@ class BTree : public Container<E> {
 		virtual void remove(const E e[], size_t s);
 		virtual bool member(const E& e) const;
 		virtual size_t size() const;
-		virtual void size_(Node* current, size_t &n) const;
 		virtual bool empty() const;
 		virtual size_t apply(const Functor<E>& f, Order order) const;
 		virtual E min() const;
@@ -171,10 +177,6 @@ class BTree : public Container<E> {
 		virtual std::ostream& print(std::ostream &o) const;
 	private:
 		virtual void delete_(Node* current);
-		virtual bool applyInnerAsc(const Functor<E>& f, InnerNode* current, size_t &n) const;
-		virtual bool applyInnerDesc(const Functor<E>& f, InnerNode* current, size_t &n) const;
-		virtual bool applyLeafAsc(const Functor<E>& f, LeafNode* current, size_t &n) const;
-		virtual bool applyLeafDesc(const Functor<E>& f, LeafNode* current, size_t &n) const;
 		bool validate(Node* current) const;
 		E& findInsertKey(Node* current) const;
 		int order;
@@ -261,7 +263,7 @@ bool BTree<E>::validate(Node *current) const {
 template <typename E> 
 void BTree<E>::add(const E& e) {
 	if (!root) {
-		root = new LeafNode(0,order);
+		root = new LeafNode(0,order, 0, 0);
 		minimum = e;
 		maximum = e;
 	}
@@ -275,8 +277,8 @@ void BTree<E>::add(const E& e) {
 			return;
 		} else {
 			// Root Node is full
-			LeafNode *right = new LeafNode(0, order);
-			LeafNode *left = new LeafNode(0, order);
+			LeafNode *right = new LeafNode(0, order, 0, 0);
+			LeafNode *left = new LeafNode(0, order, 0, 0);
 			int stop = e > static_cast<LeafNode*>(root)->data[order] ? order+1 : order;
 			for (int i = 0; i < stop; i++) {
 				left->data[i] = static_cast<LeafNode*>(root)->data[i];
@@ -297,6 +299,8 @@ void BTree<E>::add(const E& e) {
 			static_cast<InnerNode*>(root)->sizeKeys = 1;
 			left->parent = root;
 			right->parent = root;
+			left->next = right;
+			right->prev = left;
 			return;
 		}
 	}
@@ -317,7 +321,7 @@ void BTree<E>::add(const E& e) {
 	LeafNode* temp = static_cast<LeafNode*>(current);
 	if (temp->addData(e)) return;
 
-	LeafNode* insertNode = new LeafNode(temp->parent, order);
+	LeafNode* insertNode = new LeafNode(temp->parent, order, 0, 0);
 
 	E dataOverflow;
 	if (e > temp->data[order*2]) {
@@ -334,6 +338,12 @@ void BTree<E>::add(const E& e) {
 	insertNode->data[order] = dataOverflow;
 	insertNode->size = order+1;
 	temp->size = order+1;
+
+	// rebuild linked list
+	insertNode->next = temp->next;
+	insertNode->prev = temp;
+	if (temp->next) temp->next->prev = insertNode;
+	temp->next = insertNode;
 
 	InnerNode* currentInner = static_cast<InnerNode*>(temp->parent);
 
@@ -507,6 +517,8 @@ void BTree<E>::remove(const E& e){
 	for (i = 0; i < temp->size; i++) {
 		add(temp->data[i]);
 	}
+	if (temp->prev) temp->prev->next = temp->next;
+	if (temp->next) temp->next->prev = temp->prev;
 	delete temp;
 	temp = 0;
 
@@ -653,21 +665,16 @@ bool BTree<E>::member(const E& e) const{
 template <typename E> 
 size_t BTree<E>::size() const{
 	if (!root) return 0;
-	size_t i = 0;
-	size_(root, i);
-	return i;
-
-}
-
-template <typename E> 
-void BTree<E>::size_(Node *current, size_t &n) const{
-	if (!current->isLeafNode()) {
-		for (int i = 0; i < static_cast<InnerNode*>(current)->sizeChildren; i++) {
-			size_(static_cast<InnerNode*>(current)->children[i], n);
-		}
-	} else {
-		n += static_cast<LeafNode*>(current)->size;
+	size_t n = 0;
+	Node *current = root;
+	while (!current->isLeafNode())
+		current = static_cast<InnerNode*>(current)->children[0];
+	LeafNode *c = static_cast<LeafNode*>(current);
+	while (c) {
+		n += c->size;
+		c = c->next;
 	}
+	return n;
 }
 
 template <typename E> 
@@ -678,72 +685,39 @@ bool BTree<E>::empty() const{
 template <typename E> 
 size_t BTree<E>::apply(const Functor<E>& f, Order o = dontcare) const {
 	if (!root) return 0;
-	size_t i = 0;
-	if (root->isLeafNode()) {
-		if (o == descending)
-			applyLeafDesc(f, static_cast<LeafNode*>(root), i);
-		else
-			applyLeafAsc(f, static_cast<LeafNode*>(root), i);
+	size_t n = 0;
+	if (o == ascending) {
+		// look for leftmost node
+		Node *current = root;
+		while (!current->isLeafNode())
+			current = static_cast<InnerNode*>(current)->children[0];
+		LeafNode *c = static_cast<LeafNode*>(current);
+		while (c) {
+			for (int i = 0; i < c->size; i++) {
+				if (f(c->data[i]))
+					n++;
+				else
+					return n+1;
+			}
+			c = c->next;
+		}
+		return n;
 	} else {
-		if (o == descending)
-			applyInnerDesc(f, static_cast<InnerNode*>(root), i);
-		else
-			applyInnerAsc(f, static_cast<InnerNode*>(root), i);
-	}
-	return i;
-}
-
-template <typename E> 
-bool BTree<E>::applyInnerAsc(const Functor<E>& f, InnerNode *current, size_t &n) const {
-	if (!current->children[0]->isLeafNode()) {
-		bool cont = true;
-		for (int i = 0; i < current->sizeChildren; i++) {
-			if (!cont) return false;
-			cont = applyInnerAsc(f, static_cast<InnerNode*>(current->children[i]), n);
+		Node *current = root;
+		while (!current->isLeafNode())
+			current = static_cast<InnerNode*>(current)->children[static_cast<InnerNode*>(current)->sizeKeys];
+		LeafNode *c = static_cast<LeafNode*>(current);
+		while (c) {
+			for (int i = c->size-1; i >= 0; i--) {
+				if (f(c->data[i]))
+					n++;
+				else
+					return n+1;
+			}
+			c = c->prev;
 		}
-	} else {
-		bool cont = true;
-		for (int i = 0; i < current->sizeChildren; i++) {
-			if (!cont) return false;
-			cont = applyLeafAsc(f, static_cast<LeafNode*>(current->children[i]), n);
-		}
+		return n;
 	}
-	return true;
-}
-template <typename E> 
-bool BTree<E>::applyInnerDesc(const Functor<E>& f, InnerNode *current, size_t &n) const {
-	if (!current->children[0]->isLeafNode()) {
-		bool cont = true;
-		for (int i = current->sizeChildren-1; i >= 0; i--) {
-			if (!cont) return false;
-			cont = applyInnerDesc(f, static_cast<InnerNode*>(current->children[i]), n);
-		}
-	} else {
-		bool cont = true;
-		for (int i = current->sizeChildren-1; i >= 0; i--) {
-			if (!cont) return false;
-			cont = applyLeafDesc(f, static_cast<LeafNode*>(current->children[i]), n);
-		}
-	}
-	return true;
-}
-
-template <typename E> 
-bool BTree<E>::applyLeafAsc(const Functor<E>& f, LeafNode *current, size_t &n) const {
-	for (int i = 0; i < current->size; i++) {
-		n++;
-		if (!f(current->data[i])) return false;
-	}
-	return true;
-}
-
-template <typename E> 
-bool BTree<E>::applyLeafDesc(const Functor<E>& f, LeafNode *current, size_t &n) const {
-	for (int i = current->size-1; i >= 0; i--) {
-		n++;
-		if (!f(current->data[i])) return false;
-	}
-	return true;
 }
 
 template <typename E> 
@@ -760,7 +734,8 @@ E BTree<E>::max() const {
 
 template <typename E>
 std::ostream& BTree<E>::print(std::ostream &o) const {
-	root->print(o);
+	if (root)
+		root->print(o);
 	return o;
 }
 
