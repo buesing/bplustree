@@ -1,5 +1,4 @@
 // TODO:
-// implement size variable
 // quicker member?
 // quicker add?
 
@@ -20,7 +19,7 @@ class BTree : public Container<E> {
 
 	class InnerNode;
 	class LeafNode;
-	// SUBCLASS NODE
+	// subclass node
 	class Node {
 		public:
 			Node* parent;
@@ -161,7 +160,7 @@ class BTree : public Container<E> {
 				}
 				o << endl;
 			}
-	}; // END SUBCLASS NODE
+	}; // subclass node
 	
 	public:
 		BTree(int);
@@ -179,7 +178,7 @@ class BTree : public Container<E> {
 		virtual std::ostream& print(std::ostream &o) const;
 	private:
 		virtual void delete_(Node* current);
-		bool validate(Node* current) const;
+		LeafNode* findNode(const E&) const;
 		E& findInsertKey(Node* current) const;
 		int order;
 		size_t count;
@@ -201,12 +200,13 @@ class BTreeInternalException : public ContainerException {
 };
 
 template <typename E> 
-BTree<E>::BTree(int o = 8): order(o){
+BTree<E>::BTree(int o = 8): 
+	order(o),
+	root(0),
+	count(0),
+	beginning(0)
+	end(0) {
 	// actual allocation begins in add()
-	root = 0;
-	count = 0;
-	beginning = 0;
-	end = 0;
 }
 
 template <typename E> 
@@ -236,30 +236,18 @@ E& BTree<E>::findInsertKey(Node *current) const {
 }
 
 template <typename E> 
-bool BTree<E>::validate(Node *current) const {
-	if (!current->isLeafNode()) {
+LeafNode* BTree<E>::findNode(const E&) const {
+	Node* current = root;
+	while (!current->isLeafNode()) {
+		parent_index = 0;
 		InnerNode* temp = static_cast<InnerNode*>(current);
-		if (temp->parent && temp->sizeKeys < order) return false;
-		if (temp->sizeKeys != temp->sizeChildren-1) return false;
-		if (!temp->children[0]->isLeafNode()) {
-			for (int i = 0; i < temp->sizeChildren; i++) {
-				if (!(static_cast<InnerNode*>(static_cast<InnerNode*>(temp->children[i])->parent)->keys[0] == temp->keys[0])) {
-					return false;
-				}
-				return (validate(temp->children[i]));
-			}
-		} else {
-			for (int childIndex = 0; childIndex < temp->sizeKeys-1; childIndex++) {
-				LeafNode* ln = static_cast<LeafNode*>(temp->children[childIndex]);
-				for (int i = 0; i < ln->size; i++) {
-					if (!(temp->keys[childIndex] > ln->data[i])) return false;
-					if (temp->parent && temp->keys[0] == static_cast<InnerNode*>(temp->parent)->keys[childIndex])
-						return false;
-				}
-			}
+		while (parent_index < temp->sizeKeys && 
+			!((temp->keys[parent_index] > e))) {
+			parent_index++;
 		}
+		current = temp->children[parent_index];
 	}
-	return true;
+	return current;
 }
 
 template <typename E> 
@@ -270,7 +258,6 @@ void BTree<E>::add(const E& e) {
 		end = beginning;
 	}
 	if (root->isLeafNode()) {
-		// todo: size
 		int addReturn = static_cast<LeafNode*>(root)->addData(e);
 		if (addReturn != 0) {
 			if (addReturn == 2) count++;
@@ -324,13 +311,17 @@ void BTree<E>::add(const E& e) {
 	LeafNode* temp = static_cast<LeafNode*>(current);
 	int addReturn = temp->addData(e);
 	if (addReturn != 0) {
+		// if we actually inserted something, increment size
 		if (addReturn == 2) count++;
 		return;
 	}
 
+	// node full. put up with splitting etc.
 	count++;
 	LeafNode* insertNode = new LeafNode(temp->parent, order, 0, 0);
 
+	// insert element into node and save last element as overflow
+	// TODO this is a little inefficient.
 	E dataOverflow;
 	if (e > temp->data[order*2]) {
 		dataOverflow = e;
@@ -358,7 +349,7 @@ void BTree<E>::add(const E& e) {
 
 	if (currentInner->insertLeafNode(insertNode)) return;
 
-	// strange technique: add element into node, save overflow (last element)
+	// add element into node, save overflow (last element)
 	// then split nodes in middle
 	LeafNode* overflow;
 	if (insertNode->data[0] > static_cast<LeafNode*>(currentInner->children[order*2])->data[0]) {
@@ -430,6 +421,7 @@ void BTree<E>::add(const E& e) {
 		insertKey = currentInner->keys[order];
 	}
 
+	// root node split is neccessary
 	InnerNode* newRoot = new InnerNode(0, order);
 	newRoot->keys[0] = insertKey;
 	newRoot->children[0] = currentInner;
