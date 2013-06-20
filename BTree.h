@@ -121,12 +121,12 @@ class BTree : public Container<E> {
 				//	0: node full
 				//  1: element already in there
 				//  2: element was added and size increased
-				if (size == this->nodeOrder*2+1) return 0;
 				int i = 0;
 				while (i < size && !(data[i] > e)) {
 					if (e == data[i]) return 1;
 					i++;
 				}
+				if (size == this->nodeOrder*2+1) return 0;
 				for (int s = size; s > i; s--) data[s] = data[s-1];
 				data[i] = e;
 				size++;
@@ -178,13 +178,12 @@ class BTree : public Container<E> {
 		virtual std::ostream& print(std::ostream &o) const;
 	private:
 		virtual void delete_(Node* current);
-		LeafNode* findNode(const E&) const;
 		E& findInsertKey(Node* current) const;
 		int order;
+		Node *root;
 		size_t count;
 		LeafNode* beginning;
 		LeafNode* end;
-		Node *root;
 };
 
 class BTreeEmptyException : public ContainerException {
@@ -204,7 +203,7 @@ BTree<E>::BTree(int o = 8):
 	order(o),
 	root(0),
 	count(0),
-	beginning(0)
+	beginning(0),
 	end(0) {
 	// actual allocation begins in add()
 }
@@ -233,21 +232,6 @@ template <typename E>
 E& BTree<E>::findInsertKey(Node *current) const {
 	if (!current->isLeafNode()) return (findInsertKey(static_cast<InnerNode*>(current)->children[0]));
 	else return (static_cast<LeafNode*>(current)->data[0]);
-}
-
-template <typename E> 
-LeafNode* BTree<E>::findNode(const E&) const {
-	Node* current = root;
-	while (!current->isLeafNode()) {
-		parent_index = 0;
-		InnerNode* temp = static_cast<InnerNode*>(current);
-		while (parent_index < temp->sizeKeys && 
-			!((temp->keys[parent_index] > e))) {
-			parent_index++;
-		}
-		current = temp->children[parent_index];
-	}
-	return current;
 }
 
 template <typename E> 
@@ -320,21 +304,14 @@ void BTree<E>::add(const E& e) {
 	count++;
 	LeafNode* insertNode = new LeafNode(temp->parent, order, 0, 0);
 
-	// insert element into node and save last element as overflow
-	// TODO this is a little inefficient.
-	E dataOverflow;
-	if (e > temp->data[order*2]) {
-		dataOverflow = e;
-	} else {
-		dataOverflow = temp->data[order*2];
+	// copy elements to new node
+	int stop = e > temp->data[order] ? order+1 : order;
+	for (int i = stop; i < order*2+1; i++) {
+		insertNode->data[i-stop] = temp->data[i];
+		insertNode->size++;
 		temp->size--;
-		temp->addData(e);
 	}
-
-	for (int i = 0; i < order; i++) {
-		insertNode->data[i] = temp->data[i+order+1];
-	}
-	insertNode->data[order] = dataOverflow;
+	stop == order ? temp->addData(e) : insertNode->addData(e);
 	insertNode->size = order+1;
 	temp->size = order+1;
 
