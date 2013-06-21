@@ -455,19 +455,17 @@ void BTree<E>::remove(const E& e){
 	// now we have an underflow and we are not working on the root node, so a rebuild is neccessary
 	// try borrowing element from left sibling
 	InnerNode* parent = static_cast<InnerNode*>(temp->parent);
-	if (parent_index != 0 && static_cast<LeafNode*>(parent->children[parent_index-1])->size > order) {
-		LeafNode *leftSibling = static_cast<LeafNode*>(parent->children[parent_index-1]);
-		temp->addData(leftSibling->data[--leftSibling->size]);
+	if (parent_index != 0 && temp->prev->size > order) {
+		temp->addData(temp->prev->data[--temp->prev->size]);
 		parent->keys[parent_index-1] = temp->data[0];
 		return;
 	}
 
 	// try borrowing element from right sibling
-	if (parent_index < parent->sizeKeys && static_cast<LeafNode*>(parent->children[parent_index+1])->size > order) {
-		LeafNode *rightSibling = static_cast<LeafNode*>(parent->children[parent_index+1]);
-		temp->addData(rightSibling->data[0]);
-		rightSibling->remove(rightSibling->data[0]);
-		parent->keys[parent_index] = rightSibling->data[0];
+	if (parent_index < parent->sizeKeys && temp->next->size > order) {
+		temp->addData(temp->next->data[0]);
+		temp->next->remove(temp->next->data[0]);
+		parent->keys[parent_index] = temp->next->data[0];
 		return;
 	}
 
@@ -542,7 +540,6 @@ void BTree<E>::remove(const E& e){
 			return;
 		}
 
-
 		// if right sibling, put all their elements into curr
 		if (parent_index < parent->sizeKeys) {
 			InnerNode *rightSibling = static_cast<InnerNode*>(parent->children[parent_index+1]);
@@ -571,6 +568,7 @@ void BTree<E>::remove(const E& e){
 			delete rightSibling;
 			rightSibling = 0;
 		}
+
 		// if left sibling, put all currs elements there
 		else if (parent_index > 0) {
 
@@ -594,7 +592,7 @@ void BTree<E>::remove(const E& e){
 			parent->sizeChildren--;
 			delete curr;
 			curr = 0;
-		} 
+		}
 		// done, continue with parent of parent
 		curr = parent;
 		parent = static_cast<InnerNode*>(curr->parent);
