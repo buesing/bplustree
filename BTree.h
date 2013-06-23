@@ -1,7 +1,3 @@
-// TODO:
-// quicker member?
-// quicker add?
-
 #ifndef BTREE_H
 #define BTREE_H
 
@@ -16,7 +12,6 @@ class BTreeInternalException;
 
 template <typename E> 
 class BTree : public Container<E> {
-
 	class InnerNode;
 	class LeafNode;
 	// subclass node
@@ -200,12 +195,7 @@ class BTreeInternalException : public ContainerException {
 
 template <typename E> 
 BTree<E>::BTree(int o = 8): 
-	order(o),
-	root(0),
-	count(0),
-	beginning(0),
-	end(0) {
-	// actual allocation begins in add()
+	order(o), root(0), count(0), beginning(0), end(0) {
 }
 
 template <typename E> 
@@ -279,7 +269,6 @@ void BTree<E>::add(const E& e) {
 			return;
 		}
 	}
-
 	Node *current = root;
 	int parent_index = 0;
 	while (!current->isLeafNode()) {
@@ -299,7 +288,7 @@ void BTree<E>::add(const E& e) {
 		if (addReturn == 2) count++;
 		return;
 	}
-
+	
 	// node full. put up with splitting etc.
 	count++;
 	LeafNode* insertNode = new LeafNode(temp->parent, order, 0, 0);
@@ -323,7 +312,6 @@ void BTree<E>::add(const E& e) {
 	temp->next = insertNode;
 
 	InnerNode* currentInner = static_cast<InnerNode*>(temp->parent);
-
 	if (currentInner->insertLeafNode(insertNode)) return;
 
 	// add element into node, save overflow (last element)
@@ -339,7 +327,6 @@ void BTree<E>::add(const E& e) {
 	}
 
 	InnerNode* newRight = new InnerNode(currentInner->parent, order);
-
 	for (int i = order+1; i < order*2; i++) {
 		newRight->keys[i-(order+1)] = currentInner->keys[i];
 		newRight->children[i-(order+1)] = currentInner->children[i];
@@ -350,7 +337,6 @@ void BTree<E>::add(const E& e) {
 	newRight->children[order] = overflow;
 	newRight->children[order]->parent = newRight;
 	newRight->keys[order-1] = overflow->data[0];
-
 	newRight->sizeKeys = order;
 	newRight->sizeChildren = order+1;
 
@@ -397,7 +383,6 @@ void BTree<E>::add(const E& e) {
 		currentInner->sizeChildren = order+1;
 		insertKey = currentInner->keys[order];
 	}
-
 	// root node split is neccessary
 	InnerNode* newRoot = new InnerNode(0, order);
 	newRoot->keys[0] = insertKey;
@@ -413,9 +398,7 @@ void BTree<E>::add(const E& e) {
 
 template <typename E>
 void BTree<E>::add(const E e[], size_t s) {
-	for (unsigned i = 0; i < s; i++) {
-		add(e[i]);
-	}
+	for (unsigned i = 0; i < s; i++) add(e[i]);
 }
 
 template <typename E> 
@@ -448,9 +431,7 @@ void BTree<E>::remove(const E& e){
 	}
 
 	// if no underflows, return
-	if (temp->size >= order || !temp->parent) {
-		return;
-	}
+	if (temp->size >= order || !temp->parent) return;
 	
 	// now we have an underflow and we are not working on the root node, so a rebuild is neccessary
 	// try borrowing element from left sibling
@@ -502,42 +483,45 @@ void BTree<E>::remove(const E& e){
 		while (parent_index < parent->sizeKeys && !(parent->keys[parent_index] > curr->keys[0]))
 			parent_index++;
 
-		if (parent_index != 0 && static_cast<InnerNode*>(parent->children[parent_index-1])->sizeKeys > order) {
+		if (parent_index != 0) {
 			InnerNode *leftSibling = static_cast<InnerNode*>(parent->children[parent_index-1]);
+			if (leftSibling->sizeKeys > order) {
+				// insert rightmost node of left sibling at beginning
+				for (int i = curr->sizeKeys; i > 0; i--) {
+					curr->keys[i] = curr->keys[i-1];
+					curr->children[i+1] = curr->children[i];
+				}
+				curr->children[1] = curr->children[0];
+				curr->children[0] = leftSibling->children[leftSibling->sizeChildren-1];
+				curr->children[0]->parent = curr;
+				curr->keys[0] = parent->keys[parent_index-1];
+				curr->sizeChildren++;
+				curr->sizeKeys++;
+				leftSibling->sizeChildren--;
+				leftSibling->sizeKeys--;
 
-			// insert rightmost node of left sibling at beginning
-			for (int i = curr->sizeKeys; i > 0; i--) {
-				curr->keys[i] = curr->keys[i-1];
-				curr->children[i+1] = curr->children[i];
+				parent->keys[parent_index-1] = leftSibling->keys[leftSibling->sizeKeys];
+				return;
 			}
-			curr->children[1] = curr->children[0];
-			curr->children[0] = leftSibling->children[leftSibling->sizeChildren-1];
-			curr->children[0]->parent = curr;
-			curr->keys[0] = parent->keys[parent_index-1];
-			curr->sizeChildren++;
-			curr->sizeKeys++;
-			leftSibling->sizeChildren--;
-			leftSibling->sizeKeys--;
-
-			parent->keys[parent_index-1] = leftSibling->keys[leftSibling->sizeKeys];
-			return;
 		}
-		if (parent_index < parent->sizeKeys && static_cast<InnerNode*>(parent->children[parent_index+1])->sizeKeys > order) {
+		if (parent_index < parent->sizeKeys) {
 			InnerNode *rightSibling = static_cast<InnerNode*>(parent->children[parent_index+1]);
-			curr->keys[curr->sizeKeys++] = parent->keys[parent_index];
-			curr->children[curr->sizeChildren++] = rightSibling->children[0];
-			curr->children[curr->sizeChildren-1]->parent = curr;
-			parent->keys[parent_index] = rightSibling->keys[0];
+			if (rightSibling->sizeKeys > order) {
+				curr->keys[curr->sizeKeys++] = parent->keys[parent_index];
+				curr->children[curr->sizeChildren++] = rightSibling->children[0];
+				curr->children[curr->sizeChildren-1]->parent = curr;
+				parent->keys[parent_index] = rightSibling->keys[0];
 
-			// delete old node out of right sibling
-			for (int i = 0; i < rightSibling->sizeKeys-1; i++) {
-				rightSibling->children[i] = rightSibling->children[i+1];
-				rightSibling->keys[i] = rightSibling->keys[i+1];
+				// delete old node out of right sibling
+				for (int i = 0; i < rightSibling->sizeKeys-1; i++) {
+					rightSibling->children[i] = rightSibling->children[i+1];
+					rightSibling->keys[i] = rightSibling->keys[i+1];
+				}
+				rightSibling->children[rightSibling->sizeKeys-1] = rightSibling->children[rightSibling->sizeKeys];
+				rightSibling->sizeChildren--;
+				rightSibling->sizeKeys--;
+				return;
 			}
-			rightSibling->children[rightSibling->sizeKeys-1] = rightSibling->children[rightSibling->sizeKeys];
-			rightSibling->sizeChildren--;
-			rightSibling->sizeKeys--;
-			return;
 		}
 
 		// if right sibling, put all their elements into curr
@@ -571,7 +555,6 @@ void BTree<E>::remove(const E& e){
 
 		// if left sibling, put all currs elements there
 		else if (parent_index > 0) {
-
 			// put as many nodes as possible in left sibling
 			InnerNode *leftSibling = static_cast<InnerNode*>(parent->children[parent_index-1]);
 			leftSibling->insertInnerNode(static_cast<InnerNode*>(curr->children[0]), parent->keys[parent_index-1]);
@@ -607,9 +590,7 @@ void BTree<E>::remove(const E& e){
 
 template <typename E> 
 void BTree<E>::remove(const E e[], size_t s){
-	for (unsigned int i = 0; i < s; i++) {
-		remove(e[i]);
-	}
+	for (unsigned int i = 0; i < s; i++) remove(e[i]);
 	return;
 }
 
@@ -620,24 +601,19 @@ bool BTree<E>::member(const E& e) const{
 	while (!current->isLeafNode()) {
 		InnerNode* temp = static_cast<InnerNode*>(current);
 		int next = 0;
-		while (next < temp->sizeKeys && (e > temp->keys[next] || e == temp->keys[next])) {
-			next++;
-		}
+		while (next < temp->sizeKeys && (e > temp->keys[next] || e == temp->keys[next])) next++;
 		current = temp->children[next];
 	}
 	LeafNode* temp = static_cast<LeafNode*>(current);
 	for (int i = 0; i < temp->size; i++) {
-		if (temp->data[i] == e) {
-			return true;
-		}
+		if (temp->data[i] == e) return true;
 	}
 	return false;
 }
 
 template <typename E> 
 size_t BTree<E>::size() const{
-	if (!root) return 0;
-	return count;
+	return !root ? 0 : count;
 }
 
 template <typename E> 
@@ -653,10 +629,8 @@ size_t BTree<E>::apply(const Functor<E>& f, Order o = dontcare) const {
 		LeafNode *c = beginning;
 		while (c) {
 			for (int i = 0; i < c->size; i++) {
-				if (f(c->data[i]))
-					n++;
-				else
-					return n+1;
+				if (f(c->data[i])) n++;
+				else return n+1;
 			}
 			c = c->next;
 		}
@@ -665,10 +639,8 @@ size_t BTree<E>::apply(const Functor<E>& f, Order o = dontcare) const {
 		LeafNode *c = end;
 		while (c) {
 			for (int i = c->size-1; i >= 0; i--) {
-				if (f(c->data[i]))
-					n++;
-				else
-					return n+1;
+				if (f(c->data[i])) n++;
+				else return n+1;
 			}
 			c = c->prev;
 		}
@@ -690,8 +662,7 @@ E BTree<E>::max() const {
 
 template <typename E>
 std::ostream& BTree<E>::print(std::ostream &o) const {
-	if (root)
-		root->print(o);
+	if (root) root->print(o);
 	return o;
 }
 
