@@ -1,6 +1,3 @@
-// Guten Abend Herr Wanek,
-// das ist kein Plagiat!
-
 #ifndef BTREE_H
 #define BTREE_H
 
